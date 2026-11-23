@@ -1,0 +1,3761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Particle Wind Studio — Gargantua Black Hole Mobile &amp; HD Edition</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --glass-bg: rgba(14, 11, 9, 0.78);
+      --glass-bg-strong: rgba(12, 9, 7, 0.90);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-border-strong: rgba(255, 180, 67, 0.52);
+      --text-primary: #fbf7f2;
+      --text-secondary: #c4b5a5;
+      --text-muted: #8c7b6b;
+      --accent-gold: #ffb443;
+      --accent-gold-soft: #ffe2a8;
+      --radius-lg: 16px;
+      --radius-md: 11px;
+      --radius-sm: 8px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Fullscreen Particle Canvas */
+    #simCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      display: block;
+      background: #000000;
+      touch-action: none;
+      z-index: 1;
+    }
+
+    /* Interactive Cursor / Touch Force Ring */
+    #cursorRing {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 180, 67, 0.46);
+      box-shadow: 0 0 24px rgba(255, 160, 50, 0.18), inset 0 0 18px rgba(255, 180, 67, 0.08);
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transform: translate3d(-9999px, -9999px, 0);
+      transition: opacity 0.14s ease, border-color 0.2s ease;
+    }
+
+    #cursorRing.vortex {
+      border-style: dashed;
+      border-color: rgba(255, 226, 168, 0.72);
+    }
+
+    /* Shared Glassmorphism Surface */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.72);
+    }
+
+    /* Top-Left Telemetry & Live Cycle Phase HUD */
+    #hud {
+      position: fixed;
+      top: calc(14px + var(--safe-top));
+      left: calc(14px + var(--safe-left));
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 10px 13px;
+      border-radius: var(--radius-lg);
+      min-width: 242px;
+      max-width: calc(100vw - 28px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    body.ui-hidden #hud,
+    body.ui-hidden #controlDock {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+    }
+
+    .hud-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .hud-right-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .phase-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-primary);
+    }
+
+    .phase-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-gold);
+      box-shadow: 0 0 10px var(--accent-gold);
+      flex-shrink: 0;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .phase-pill[data-phase="assemble"] .phase-dot {
+      background: #ffb443;
+      box-shadow: 0 0 11px rgba(255, 180, 67, 0.95);
+    }
+
+    .phase-pill[data-phase="hold"] .phase-dot {
+      background: #fff5e0;
+      box-shadow: 0 0 11px rgba(255, 236, 196, 0.92);
+    }
+
+    .phase-pill[data-phase="disappear"] .phase-dot {
+      background: #ff7b36;
+      box-shadow: 0 0 12px rgba(255, 123, 54, 0.95);
+    }
+
+    .phase-pill[data-phase="reform"] .phase-dot {
+      background: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .engine-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: var(--accent-gold-soft);
+      background: rgba(255, 180, 67, 0.12);
+      border: 1px solid rgba(255, 180, 67, 0.28);
+      white-space: nowrap;
+    }
+
+    .hud-hide-mobile {
+      display: none;
+    }
+
+    .phase-bar-track {
+      width: 100%;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.09);
+      overflow: hidden;
+    }
+
+    .phase-bar-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ff6a26, #ffb443, #fff0c8);
+      box-shadow: 0 0 10px rgba(255, 180, 67, 0.65);
+      transition: width 0.05s linear;
+    }
+
+    .hud-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+
+    .hud-stat strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* Floating Restore Button when UI is hidden */
+    #uiRestoreBtn {
+      position: fixed;
+      top: calc(14px + var(--safe-top));
+      right: calc(14px + var(--safe-right));
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.16s ease;
+    }
+
+    body.ui-hidden #uiRestoreBtn {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    #uiRestoreBtn:hover {
+      border-color: var(--glass-border-strong);
+    }
+
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-secondary);
+    }
+
+    /* Desktop Top-Right Control Dock (transforms into Bottom Sheet on Phones) */
+    #controlDock {
+      position: fixed;
+      top: calc(14px + var(--safe-top));
+      right: calc(14px + var(--safe-right));
+      z-index: 25;
+      width: 312px;
+      max-width: calc(100vw - 28px);
+      max-height: calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom));
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: opacity 0.24s ease, transform 0.24s ease;
+    }
+
+    .dock-grab {
+      display: none;
+      width: 36px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      margin: 7px auto 2px;
+      flex-shrink: 0;
+    }
+
+    .dock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .dock-title-wrap {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .dock-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--text-primary);
+    }
+
+    .dock-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent-gold-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dock-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* Quick action bar shown only on compact phone view */
+    .mobile-quick-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px 10px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.26);
+    }
+
+    .dock-body {
+      padding: 12px 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+    }
+
+    #controlDock.collapsed .dock-body {
+      display: none;
+    }
+
+    #controlDock.collapsed .dock-header {
+      border-bottom: none;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .section-meta {
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      text-transform: none;
+      letter-spacing: 0.02em;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      width: 100%;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .btn-row-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 10px;
+      min-height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(255, 152, 46, 0.28), rgba(255, 180, 67, 0.14));
+      border-color: rgba(255, 180, 67, 0.50);
+      color: #fff6e6;
+    }
+
+    .btn.primary:hover {
+      background: linear-gradient(135deg, rgba(255, 165, 56, 0.38), rgba(255, 190, 82, 0.22));
+      border-color: rgba(255, 226, 168, 0.80);
+      box-shadow: 0 0 18px rgba(255, 180, 67, 0.22);
+    }
+
+    .btn.active {
+      background: rgba(255, 180, 67, 0.18);
+      border-color: rgba(255, 180, 67, 0.60);
+      color: var(--accent-gold-soft);
+      box-shadow: inset 0 0 12px rgba(255, 180, 67, 0.14);
+    }
+
+    .upload-hint {
+      margin-top: 6px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* Style & Budget Grids */
+    .style-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .style-btn,
+    .budget-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 6px;
+      min-height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--text-secondary);
+      font-size: 10.5px;
+      font-weight: 500;
+      line-height: 1.2;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .style-btn:hover,
+    .budget-btn:hover {
+      background: rgba(255, 255, 255, 0.11);
+      color: var(--text-primary);
+    }
+
+    .style-btn.selected,
+    .budget-btn.selected {
+      background: rgba(255, 180, 67, 0.18);
+      border-color: rgba(255, 180, 67, 0.62);
+      color: var(--accent-gold-soft);
+      box-shadow: 0 0 14px rgba(255, 180, 67, 0.15);
+    }
+
+    .budget-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+
+    .b-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: inherit;
+    }
+
+    .b-label {
+      font-size: 9px;
+      opacity: 0.78;
+      margin-top: 1px;
+    }
+
+    /* Segmented Controls */
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      gap: 3px;
+    }
+
+    .seg-btn {
+      padding: 7px 8px;
+      min-height: 32px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .seg-btn.selected {
+      background: rgba(255, 180, 67, 0.20);
+      color: var(--accent-gold-soft);
+      box-shadow: inset 0 0 0 1px rgba(255, 180, 67, 0.46);
+    }
+
+    .dpr-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin-top: 7px;
+    }
+
+    .dpr-label {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* Sliders */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .slider-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .slider-name {
+      color: var(--text-secondary);
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--accent-gold-soft);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff8eb;
+      border: 2px solid var(--accent-gold);
+      box-shadow: 0 0 10px rgba(255, 180, 67, 0.72);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff8eb;
+      border: 2px solid var(--accent-gold);
+      box-shadow: 0 0 10px rgba(255, 180, 67, 0.72);
+      cursor: pointer;
+    }
+
+    /* Fullscreen Drag & Drop Overlay */
+    #dropOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 6, 3, 0.84);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+
+    #dropOverlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drop-card {
+      padding: 26px 32px;
+      border-radius: 20px;
+      border: 1.5px dashed rgba(255, 180, 67, 0.75);
+      background: rgba(24, 15, 8, 0.88);
+      text-align: center;
+      margin: 16px;
+      box-shadow: 0 0 42px rgba(255, 160, 50, 0.18);
+    }
+
+    .drop-card h2 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #fff6e6;
+      margin-bottom: 6px;
+    }
+
+    .drop-card p {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    /* Status Toast */
+    #toast {
+      position: fixed;
+      top: calc(74px + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      z-index: 50;
+      padding: 8px 15px;
+      border-radius: 999px;
+      background: rgba(18, 12, 8, 0.94);
+      border: 1px solid rgba(255, 180, 67, 0.38);
+      color: var(--text-primary);
+      font-size: 11.5px;
+      font-weight: 500;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.74);
+      opacity: 0;
+      pointer-events: none;
+      max-width: calc(100vw - 24px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* -----------------------------------------------------------------------
+       PHONE & TABLET RESPONSIVE BOTTOM-SHEET LAYOUT (ZERO HUD OVERLAP)
+       ----------------------------------------------------------------------- */
+    @media (max-width: 720px) {
+      #hud {
+        top: calc(10px + var(--safe-top));
+        left: calc(10px + var(--safe-left));
+        right: calc(10px + var(--safe-right));
+        min-width: 0;
+        max-width: none;
+        padding: 8px 12px;
+        gap: 6px;
+        border-radius: 14px;
+      }
+
+      .hud-hide-mobile {
+        display: inline-flex;
+        width: 26px;
+        height: 26px;
+        font-size: 11px;
+      }
+
+      .hud-stats {
+        justify-content: space-between;
+        font-size: 10px;
+      }
+
+      /* Dock moves to bottom as a native phone quick-bar + expandable bottom sheet */
+      #controlDock {
+        top: auto;
+        bottom: calc(10px + var(--safe-bottom));
+        left: calc(10px + var(--safe-left));
+        right: calc(10px + var(--safe-right));
+        width: auto;
+        max-width: none;
+        max-height: 62dvh;
+        border-radius: 18px;
+        background: var(--glass-bg-strong);
+      }
+
+      body.ui-hidden #controlDock {
+        transform: translateY(18px);
+      }
+
+      .dock-grab {
+        display: block;
+      }
+
+      .dock-header {
+        display: none;
+      }
+
+      .mobile-quick-bar {
+        display: grid;
+        grid-template-columns: 1.25fr 1fr 1fr auto;
+      }
+
+      #controlDock:not(.collapsed) .mobile-quick-bar {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .dock-body {
+        padding: 12px 13px 16px;
+        gap: 13px;
+      }
+
+      /* Larger touch targets for phones */
+      .btn,
+      .style-btn,
+      .budget-btn,
+      .seg-btn {
+        min-height: 42px;
+        font-size: 12px;
+      }
+
+      input[type="range"] {
+        height: 8px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+      }
+
+      #toast {
+        top: calc(86px + var(--safe-top));
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main GPU / Fallback Simulation Canvas -->
+  <canvas id="simCanvas"></canvas>
+
+  <!-- Cursor / Touch Force Radius Indicator -->
+  <div id="cursorRing" aria-hidden="true"></div>
+
+  <!-- Hidden File Input for Image Upload -->
+  <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+
+  <!-- Floating UI Restore Button (when UI hidden) -->
+  <button type="button" id="uiRestoreBtn" class="glass" title="Show Controls (H)">
+    <span>Show UI</span>
+    <kbd>H</kbd>
+  </button>
+
+  <!-- Top Telemetry & Live Cycle Phase HUD -->
+  <section id="hud" class="glass" aria-label="Simulation Status">
+    <div class="hud-top">
+      <div class="phase-pill" id="phasePill" data-phase="assemble">
+        <span class="phase-dot"></span>
+        <span id="phaseLabel">ASSEMBLING</span>
+      </div>
+      <div class="hud-right-group">
+        <span class="engine-badge" id="hudEngine">GPU WebGL2</span>
+        <button type="button" class="icon-btn hud-hide-mobile" id="btnHideUIMobile" title="Hide UI" aria-label="Hide UI">H</button>
+      </div>
+    </div>
+    <div class="phase-bar-track">
+      <div class="phase-bar-fill" id="phaseBarFill"></div>
+    </div>
+    <div class="hud-stats">
+      <span class="hud-stat"><strong id="hudFps">60</strong> FPS</span>
+      <span class="hud-stat"><strong id="hudMs">16.6</strong> ms</span>
+      <span class="hud-stat"><strong id="hudCount">0</strong> pts</span>
+    </div>
+  </section>
+
+  <!-- Glassmorphic Control Dock (Desktop: Top-Right | Phone: Bottom Sheet) -->
+  <aside id="controlDock" class="glass" aria-label="Particle Controls">
+    <div class="dock-grab" id="dockGrab"></div>
+
+    <!-- Desktop Header -->
+    <div class="dock-header" id="dockHeader">
+      <div class="dock-title-wrap">
+        <span class="dock-title">Particle Wind Studio</span>
+        <span class="dock-sub" id="activeSourceTag">Gargantua Black Hole</span>
+      </div>
+      <div class="dock-header-actions">
+        <button type="button" class="icon-btn" id="btnHideUI" title="Hide UI (H)" aria-label="Hide UI">H</button>
+        <button type="button" class="icon-btn" id="btnCollapse" title="Collapse Panel" aria-label="Collapse Panel">&#9662;</button>
+      </div>
+    </div>
+
+    <!-- Phone Quick-Tap Bottom Bar -->
+    <div class="mobile-quick-bar" id="mobileQuickBar">
+      <button type="button" class="btn primary" id="mBtnUpload">Upload Pic</button>
+      <button type="button" class="btn" id="mBtnReplay">Replay</button>
+      <button type="button" class="btn active" id="mBtnLoop">Loop</button>
+      <button type="button" class="icon-btn" id="mBtnDrawer" style="width:42px;height:42px;" aria-label="Toggle Controls" title="Controls">&#9776;</button>
+    </div>
+
+    <div class="dock-body">
+      <!-- Image Source Controls -->
+      <div>
+        <div class="section-head">
+          <span>Artwork Source</span>
+          <span class="section-meta">4-Border Convergence</span>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="btnUpload">Upload Pic</button>
+          <button type="button" class="btn active" id="btnDefaultBlackHole">Black Hole</button>
+        </div>
+        <div class="upload-hint" id="uploadHint">Relativistic accretion disk &amp; Einstein lensing &mdash; upload any photo anytime</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Playback & Effect Toggles -->
+      <div>
+        <div class="section-head">
+          <span>Playback &amp; FX</span>
+          <span class="section-meta">R / Space / G / S</span>
+        </div>
+        <div class="btn-row-3">
+          <button type="button" class="btn active" id="btnLoop" title="Toggle Auto-Loop (L)">Loop ON</button>
+          <button type="button" class="btn" id="btnReplay" title="Replay From Borders (R)">Replay</button>
+          <button type="button" class="btn" id="btnWind" title="Toggle Wind Gust (Space)">Wind</button>
+        </div>
+        <div class="btn-row-3" style="margin-top: 6px;">
+          <button type="button" class="btn active" id="btnGlow" title="Toggle Selective Glow (G)">Glow ON</button>
+          <button type="button" class="btn active" id="btnSmartFit" title="Auto-crop empty black margins for full phone framing">Smart Fit</button>
+          <button type="button" class="btn" id="btnSnap" title="Save HD PNG Snapshot (S)">Save PNG</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Disappear Style Selector -->
+      <div>
+        <div class="section-head">
+          <span>Disappear Style</span>
+          <span class="section-meta" id="styleTag">Smooth Drift</span>
+        </div>
+        <div class="style-grid">
+          <button type="button" class="style-btn selected" data-style="0">Smooth<br/>Drift</button>
+          <button type="button" class="style-btn" data-style="1">Border<br/>Scatter</button>
+          <button type="button" class="style-btn" data-style="2">Energy<br/>Gust</button>
+        </div>
+      </div>
+
+      <!-- Particle Density Budget & Resolution Toggle -->
+      <div>
+        <div class="section-head">
+          <span>Particle Density</span>
+          <span class="section-meta" id="strideTag">Grid 1.00px</span>
+        </div>
+        <div class="budget-grid">
+          <button type="button" class="budget-btn" data-budget="60000">
+            <span class="b-count">60K</span>
+            <span class="b-label">Phone</span>
+          </button>
+          <button type="button" class="budget-btn selected" data-budget="140000">
+            <span class="b-count">140K</span>
+            <span class="b-label">HD</span>
+          </button>
+          <button type="button" class="budget-btn" data-budget="240000">
+            <span class="b-count">240K</span>
+            <span class="b-label">Ultra</span>
+          </button>
+          <button type="button" class="budget-btn" data-budget="360000">
+            <span class="b-count">360K</span>
+            <span class="b-label">Max</span>
+          </button>
+        </div>
+
+        <div class="dpr-row">
+          <span class="dpr-label">Resolution</span>
+          <div class="segmented" role="group" aria-label="Display Resolution Mode">
+            <button type="button" class="seg-btn" id="dpr1x">1x Max FPS</button>
+            <button type="button" class="seg-btn selected" id="dprNative">Native HD</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Touch / Cursor Force Mode -->
+      <div>
+        <div class="section-head">
+          <span>Touch / Cursor Force</span>
+          <span class="section-meta">Drag Anywhere</span>
+        </div>
+        <div class="segmented" role="group" aria-label="Cursor Force Mode">
+          <button type="button" class="seg-btn selected" id="modeRepel">Repel</button>
+          <button type="button" class="seg-btn" id="modeVortex">Vortex</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Fine-Tuning Sliders -->
+      <div class="slider-group">
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderEndBlur">Disappear Blur</label>
+            <span class="slider-val" id="valEndBlur">0%</span>
+          </div>
+          <input type="range" id="sliderEndBlur" min="0" max="100" step="1" value="0" />
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderEdgeSoft">Bottom &amp; Edge Softness</label>
+            <span class="slider-val" id="valEdgeSoft">0%</span>
+          </div>
+          <input type="range" id="sliderEdgeSoft" min="0" max="100" step="1" value="0" />
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderHoldDur">Hold Duration</label>
+            <span class="slider-val" id="valHoldDur">2.6s</span>
+          </div>
+          <input type="range" id="sliderHoldDur" min="0.8" max="6.0" step="0.2" value="2.6" />
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderCutoff">Background Cutoff</label>
+            <span class="slider-val" id="valCutoff">6</span>
+          </div>
+          <input type="range" id="sliderCutoff" min="0" max="60" step="1" value="6" />
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderRadius">Touch / Cursor Radius</label>
+            <span class="slider-val" id="valRadius">110px</span>
+          </div>
+          <input type="range" id="sliderRadius" min="40" max="220" step="5" value="110" />
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-meta">
+            <label class="slider-name" for="sliderSize">Particle Sharpness / Size</label>
+            <span class="slider-val" id="valSize">1.00&times;</span>
+          </div>
+          <input type="range" id="sliderSize" min="0.65" max="2.0" step="0.05" value="1.0" />
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Fullscreen Drag & Drop Overlay -->
+  <div id="dropOverlay" aria-hidden="true">
+    <div class="drop-card">
+      <h2>Drop Image to Converge</h2>
+      <p>PNG, JPG, or WebP &mdash; Particles will assemble from all 4 screen borders</p>
+    </div>
+  </div>
+
+  <!-- Status Toast -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* -----------------------------------------------------------------------
+         1. DOM REFERENCES & CYCLE CONSTANTS
+         ----------------------------------------------------------------------- */
+      let canvas = document.getElementById('simCanvas');
+      const cursorRing = document.getElementById('cursorRing');
+      const fileInput = document.getElementById('fileInput');
+      const uiRestoreBtn = document.getElementById('uiRestoreBtn');
+
+      // Telemetry HUD
+      const phasePill = document.getElementById('phasePill');
+      const phaseLabel = document.getElementById('phaseLabel');
+      const phaseBarFill = document.getElementById('phaseBarFill');
+      const hudEngine = document.getElementById('hudEngine');
+      const hudFps = document.getElementById('hudFps');
+      const hudMs = document.getElementById('hudMs');
+      const hudCount = document.getElementById('hudCount');
+      const btnHideUIMobile = document.getElementById('btnHideUIMobile');
+
+      // Control Dock & Mobile Quick Bar
+      const controlDock = document.getElementById('controlDock');
+      const dockGrab = document.getElementById('dockGrab');
+      const dockHeader = document.getElementById('dockHeader');
+      const btnCollapse = document.getElementById('btnCollapse');
+      const btnHideUI = document.getElementById('btnHideUI');
+      const activeSourceTag = document.getElementById('activeSourceTag');
+      const uploadHint = document.getElementById('uploadHint');
+      const styleTag = document.getElementById('styleTag');
+      const strideTag = document.getElementById('strideTag');
+
+      const mBtnUpload = document.getElementById('mBtnUpload');
+      const mBtnReplay = document.getElementById('mBtnReplay');
+      const mBtnLoop = document.getElementById('mBtnLoop');
+      const mBtnDrawer = document.getElementById('mBtnDrawer');
+
+      const btnUpload = document.getElementById('btnUpload');
+      const btnDefaultBlackHole = document.getElementById('btnDefaultBlackHole');
+      const btnLoop = document.getElementById('btnLoop');
+      const btnReplay = document.getElementById('btnReplay');
+      const btnWind = document.getElementById('btnWind');
+      const btnGlow = document.getElementById('btnGlow');
+      const btnSmartFit = document.getElementById('btnSmartFit');
+      const btnSnap = document.getElementById('btnSnap');
+
+      const styleButtons = Array.from(document.querySelectorAll('.style-btn'));
+      const budgetButtons = Array.from(document.querySelectorAll('.budget-btn'));
+
+      const modeRepel = document.getElementById('modeRepel');
+      const modeVortex = document.getElementById('modeVortex');
+      const dpr1x = document.getElementById('dpr1x');
+      const dprNative = document.getElementById('dprNative');
+
+      const sliderEndBlur = document.getElementById('sliderEndBlur');
+      const valEndBlur = document.getElementById('valEndBlur');
+      const sliderEdgeSoft = document.getElementById('sliderEdgeSoft');
+      const valEdgeSoft = document.getElementById('valEdgeSoft');
+      const sliderHoldDur = document.getElementById('sliderHoldDur');
+      const valHoldDur = document.getElementById('valHoldDur');
+      const sliderCutoff = document.getElementById('sliderCutoff');
+      const valCutoff = document.getElementById('valCutoff');
+      const sliderRadius = document.getElementById('sliderRadius');
+      const valRadius = document.getElementById('valRadius');
+      const sliderSize = document.getElementById('sliderSize');
+      const valSize = document.getElementById('valSize');
+
+      const dropOverlay = document.getElementById('dropOverlay');
+      const toastEl = document.getElementById('toast');
+
+      // Offscreen canvases for 1920x1080 procedural Black Hole, bbox analysis, and HD sampling
+      const presetCanvas = document.createElement('canvas');
+      const presetCtx = presetCanvas.getContext('2d', { willReadFrequently: false });
+
+      const bboxCanvas = document.createElement('canvas');
+      const bboxCtx = bboxCanvas.getContext('2d', { willReadFrequently: true });
+
+      const sampleCanvas = document.createElement('canvas');
+      const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+      // Phase enum & durations (seconds)
+      const PHASE_ASSEMBLE  = 0;
+      const PHASE_HOLD      = 1;
+      const PHASE_DISAPPEAR = 2;
+      const PHASE_REFORM    = 3;
+
+      const PHASE_DURATIONS = [3.10, 2.60, 2.85, 0.28];
+      const PHASE_NAMES = ['ASSEMBLING', 'HOLDING', 'DISAPPEARING', 'REFORMING'];
+      const PHASE_KEYS  = ['assemble', 'hold', 'disappear', 'reform'];
+      const DISAPPEAR_NAMES = ['Smooth Drift', 'Border Scatter', 'Energy Gust'];
+
+      function detectPhoneLayout() {
+        return (
+          window.innerWidth <= 720 ||
+          (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 920)
+        );
+      }
+
+      const isMobile = detectPhoneLayout();
+
+      const state = {
+        cssWidth: 0,
+        cssHeight: 0,
+        physWidth: 0,
+        physHeight: 0,
+        dpr: 1,
+        dprMode: 'native',
+
+        // Auto-tuned particle budget: 60K smooth 60FPS on phones, 140K HD on desktop
+        maxBudget: isMobile ? 60000 : 140000,
+        activeCount: 0,
+        sampleStride: 1.0,
+        cutoff: 6,
+        pointSizeMult: isMobile ? 1.15 : 1.0,
+        smartFit: true,
+        imgRectUV: [0.0, 0.0, 1.0, 1.0],
+
+        // Cycle state machine
+        autoLoop: true,
+        phase: PHASE_ASSEMBLE,
+        phaseElapsed: 0,
+        phaseProgress: 0,
+        cycleSeed: 1,
+        disappearStyle: 0, // 0=Smooth Drift, 1=Border Scatter, 2=Energy Gust
+
+        // Crisp Smooth Disappear (0% blur default) + Optional Edge Softness
+        endingBlurStrength: 0.0,
+        edgeSoftness: 0.0,
+        holdDuration: 2.6,
+        endBlur: 0.0,
+        edgeMaskFactor: 0.0,
+
+        // Effects & Interactive controls
+        glowOn: true,
+        windOverride: false,
+        cursorRadiusCss: isMobile ? 90 : 110,
+        cursorMode: 'repel',
+
+        // Source artwork
+        sourceType: 'preset',
+        uploadedImage: null,
+        uploadedName: '',
+
+        // Time & pointer
+        simTime: 0,
+        gust: 0,
+        pointerActive: false,
+        pointerTouch: false,
+        pointerCssX: 0,
+        pointerCssY: 0,
+        pointerPhysX: 0,
+        pointerPhysY: 0,
+
+        uiHidden: false
+      };
+
+      let engine = null;
+      let toastTimer = null;
+      let lastNow = 0;
+      let fpsFrames = 0;
+      let fpsAccum = 0;
+      let smoothMs = 16.6;
+      let lastPhaseShown = -1;
+
+      /* -----------------------------------------------------------------------
+         2. UI HELPERS & FALLBACK CANVAS RESET
+         ----------------------------------------------------------------------- */
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('visible');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastEl.classList.remove('visible');
+        }, 2300);
+      }
+
+      function toggleUIHidden() {
+        state.uiHidden = !state.uiHidden;
+        document.body.classList.toggle('ui-hidden', state.uiHidden);
+      }
+
+      function toggleDockDrawer() {
+        const collapsed = controlDock.classList.toggle('collapsed');
+        btnCollapse.innerHTML = collapsed ? '&#9656;' : '&#9662;';
+        mBtnDrawer.innerHTML = collapsed ? '&#9776;' : '&times;';
+      }
+
+      function saveSnapshotPNG() {
+        try {
+          if (engine) {
+            // Render one synchronous frame before capture so drawing buffer is fresh
+            engine.render(buildRenderParams());
+          }
+          const url = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          link.download = `particle-black-hole-${stamp}.png`;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showToast('Saved HD PNG snapshot!');
+        } catch (err) {
+          console.error('Snapshot error:', err);
+          showToast('Snapshot failed on this browser.');
+        }
+      }
+
+      // Replaces the canvas element cleanly if an earlier WebGL context attempt locked it
+      function resetCanvasForFallback() {
+        const fresh = document.createElement('canvas');
+        fresh.id = 'simCanvas';
+        fresh.width = canvas.width || window.innerWidth;
+        fresh.height = canvas.height || window.innerHeight;
+        canvas.parentNode.replaceChild(fresh, canvas);
+        canvas = fresh;
+        attachCanvasPointerEvents(canvas);
+      }
+
+      /* -----------------------------------------------------------------------
+         3. GPU WEBGL2 TRANSFORM FEEDBACK ENGINE (MAX FPS + ZERO-BLUR DISAPPEAR)
+         ----------------------------------------------------------------------- */
+      function createWebGL2Engine() {
+        const gl = canvas.getContext('webgl2', {
+          alpha: false,
+          antialias: false,
+          depth: false,
+          stencil: false,
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+          powerPreference: 'high-performance'
+        });
+        if (!gl) return null;
+
+        function compileShader(type, src) {
+          const sh = gl.createShader(type);
+          gl.shaderSource(sh, src);
+          gl.compileShader(sh);
+          if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+            const log = gl.getShaderInfoLog(sh);
+            gl.deleteShader(sh);
+            throw new Error('WebGL2 Shader Error: ' + log);
+          }
+          return sh;
+        }
+
+        function createProgram(vsSrc, fsSrc, tfVaryings) {
+          const vs = compileShader(gl.VERTEX_SHADER, vsSrc);
+          const fs = compileShader(gl.FRAGMENT_SHADER, fsSrc);
+          const prog = gl.createProgram();
+          gl.attachShader(prog, vs);
+          gl.attachShader(prog, fs);
+          if (tfVaryings) {
+            gl.transformFeedbackVaryings(prog, tfVaryings, gl.INTERLEAVED_ATTRIBS);
+          }
+          gl.linkProgram(prog);
+          gl.deleteShader(vs);
+          gl.deleteShader(fs);
+          if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+            const log = gl.getProgramInfoLog(prog);
+            gl.deleteProgram(prog);
+            throw new Error('WebGL2 Link Error: ' + log);
+          }
+          return prog;
+        }
+
+        // --- Physics Transform Feedback Shaders ---
+        const physicsVS = `#version 300 es
+precision highp float;
+
+layout(location = 0) in vec2 a_home;
+layout(location = 1) in vec2 a_border;
+layout(location = 2) in vec3 a_color;
+layout(location = 3) in vec4 a_meta;  // x=mass, y=phase, z=baseDelay, w=waveCoord
+layout(location = 4) in vec2 a_pos;
+layout(location = 5) in vec2 a_vel;
+layout(location = 6) in vec2 a_vis;   // x=alpha, y=energy
+
+uniform float u_dt;
+uniform float u_time;
+uniform vec2  u_res;
+uniform int   u_phase;
+uniform float u_phaseProg;
+uniform int   u_disappearStyle;
+uniform float u_cycleSeed;
+uniform float u_windOverride;
+uniform float u_gust;
+uniform float u_pointerActive;
+uniform vec2  u_pointerPos;
+uniform float u_cursorRadius;
+uniform int   u_cursorMode;
+uniform float u_dpr;
+
+out vec2 v_pos;
+out vec2 v_vel;
+out vec2 v_vis;
+
+float smooth01(float x) {
+  float c = clamp(x, 0.0, 1.0);
+  return c * c * (3.0 - 2.0 * c);
+}
+
+void main() {
+  vec2 pos = a_pos;
+  vec2 vel = a_vel;
+  float alpha = a_vis.x;
+  float energy = a_vis.y;
+
+  float mass = a_meta.x;
+  float phase = a_meta.y + u_cycleSeed * 0.713;
+  float delay = a_meta.z;
+  float waveCoord = a_meta.w;
+  float dt = min(u_dt, 0.05);
+  vec2 center = u_res * 0.5;
+
+  if (u_phase == 0) {
+    // PHASE 0: ASSEMBLE FROM ALL 4 BORDERS WITH ORBITAL SWIRL
+    float localT = clamp((u_phaseProg - delay * 0.72) / max(0.08, 1.0 - delay * 0.72), 0.0, 1.0);
+    vec2 toHome = a_home - pos;
+    float dist = length(toHome);
+
+    if (localT <= 0.001) {
+      pos = a_border;
+      vel = vec2(0.0);
+      alpha = 0.0;
+      energy = 0.0;
+    } else {
+      // Smooth spring + gentle tangential cosmic swirl that settles to zero at arrival
+      float pull = mix(5.2, 22.0, localT * localT) / mass;
+      vec2 acc = toHome * pull;
+
+      float swirlEnv = sin(localT * 3.14159265) * (1.0 - localT);
+      vec2 dir = dist > 0.001 ? toHome / dist : vec2(0.0);
+      vec2 perp = vec2(-dir.y, dir.x);
+      float swirlSign = mod(floor(phase * 10.0), 2.0) > 0.5 ? 1.0 : -1.0;
+      acc += perp * swirlSign * swirlEnv * (420.0 * u_dpr) / mass;
+
+      // Subtle organic turbulence during flight
+      acc.x += sin(pos.y * 0.011 + u_time * 2.8 + phase) * 45.0 * u_dpr * swirlEnv;
+      acc.y += cos(pos.x * 0.011 + u_time * 2.4 + phase) * 45.0 * u_dpr * swirlEnv;
+
+      vel += acc * dt;
+      float damp = pow(mix(0.84, 0.62, localT), dt * 60.0);
+      vel *= damp;
+      pos += vel * dt;
+
+      // Lock crisply onto exact target pixel near the end of arrival
+      if (localT > 0.86) {
+        float snap = smooth01((localT - 0.86) / 0.14);
+        pos = mix(pos, a_home, snap * 0.55);
+        vel *= (1.0 - snap * 0.65);
+      }
+
+      alpha = smooth01(localT * 3.2);
+      energy = clamp(length(vel) / (460.0 * u_dpr), 0.0, 1.0);
+    }
+  } else if (u_phase == 1) {
+    // PHASE 1: HOLD SHARP IMAGE + INTERACTIVE TOUCH/CURSOR & OPTIONAL WIND
+    vec2 toHome = a_home - pos;
+    float springK = u_windOverride > 0.5 ? 2.6 : 13.5;
+    vec2 acc = toHome * springK;
+
+    if (u_windOverride > 0.5) {
+      float wx = (290.0 * u_gust + 65.0 * sin(pos.y * 0.014 + u_time * 2.7 + phase)) * u_dpr / mass;
+      float wy = (52.0 * cos(pos.x * 0.012 + u_time * 2.1 + phase)) * u_dpr / mass;
+      acc += vec2(wx, wy);
+    }
+
+    if (u_pointerActive > 0.5) {
+      vec2 d = pos - u_pointerPos;
+      float distSq = dot(d, d);
+      float rSq = u_cursorRadius * u_cursorRadius;
+      if (distSq < rSq && distSq > 0.0001) {
+        float dist = sqrt(distSq);
+        float falloff = 1.0 - dist / u_cursorRadius;
+        float fall2 = falloff * falloff;
+        vec2 n = d / dist;
+        if (u_cursorMode == 0) {
+          // Repel blast
+          acc += n * (fall2 * 3600.0 * u_dpr / mass);
+        } else {
+          // Gravitational vortex swirl
+          vec2 tang = vec2(-n.y, n.x);
+          acc += (tang * 2900.0 - n * 950.0) * fall2 * u_dpr / mass;
+        }
+      }
+    }
+
+    vel += acc * dt;
+    float dampBase = u_windOverride > 0.5 ? 0.91 : 0.82;
+    vel *= pow(dampBase, dt * 60.0);
+    pos += vel * dt;
+
+    // Micro-settle to prevent subpixel jitter when resting
+    float homeDist = length(a_home - pos);
+    float speed = length(vel);
+    if (u_windOverride < 0.5 && homeDist < 0.35 && speed < 6.0) {
+      pos = a_home;
+      vel = vec2(0.0);
+    }
+
+    alpha = 1.0;
+    energy = clamp(speed / (420.0 * u_dpr), 0.0, 1.0);
+  } else if (u_phase == 2) {
+    // PHASE 2: SILKY-SMOOTH CRISP DISAPPEAR (ZERO BLUR BY DEFAULT)
+    float p = u_phaseProg;
+
+    if (u_disappearStyle == 0) {
+      // Smooth Drift: S-curve gentle outward/swirl cosmic evaporation
+      float stagger = delay * 0.42;
+      float localP = clamp((p - stagger) / max(0.15, 1.0 - stagger), 0.0, 1.0);
+      float onset = smooth01(localP * 1.4);
+
+      vec2 fromC = pos - center;
+      float dC = length(fromC) + 0.001;
+      vec2 rad = fromC / dC;
+      vec2 tang = vec2(-rad.y, rad.x);
+
+      vec2 drift = rad * (155.0 + 90.0 * sin(phase)) + tang * (120.0 * cos(phase * 1.7));
+      drift.x += sin(pos.y * 0.012 + u_time * 1.6 + phase) * 58.0;
+      drift.y += cos(pos.x * 0.012 + u_time * 1.4 + phase) * 58.0 - 34.0;
+
+      vel += (drift * onset * u_dpr / mass) * dt;
+      vel *= pow(0.955, dt * 60.0);
+      pos += vel * dt;
+
+      float fade = 1.0 - smooth01(localP);
+      alpha = fade * fade;
+      energy = clamp(onset * 0.32, 0.0, 0.45);
+    } else if (u_disappearStyle == 1) {
+      // Border Scatter: Smooth ease-in glide back out to all 4 screen borders
+      float stagger = delay * 0.35;
+      float localP = clamp((p - stagger) / max(0.15, 1.0 - stagger), 0.0, 1.0);
+      float accel = smooth01(localP);
+
+      vec2 toBorder = a_border - pos;
+      vec2 acc = toBorder * (2.6 + 6.5 * accel) / mass;
+      acc.x += sin(phase + u_time * 2.2) * 45.0 * u_dpr;
+      acc.y += cos(phase * 1.3 + u_time * 2.0) * 45.0 * u_dpr;
+
+      vel += acc * dt;
+      vel *= pow(0.93, dt * 60.0);
+      pos += vel * dt;
+
+      float fade = 1.0 - smooth01(clamp((localP - 0.12) / 0.88, 0.0, 1.0));
+      alpha = fade * fade;
+      energy = clamp(accel * 0.45, 0.0, 0.55);
+    } else {
+      // Energy Gust: Sweeping cosmic wind wave left-to-right
+      float stagger = waveCoord * 0.42 + delay * 0.18;
+      float localP = clamp((p - stagger) / max(0.15, 1.0 - stagger), 0.0, 1.0);
+      float onset = smooth01(localP * 1.35);
+
+      float gustX = (420.0 + 180.0 * sin(phase + u_time * 2.4)) * onset * u_dpr / mass;
+      float gustY = (-75.0 + 130.0 * cos(pos.x * 0.011 + phase + u_time * 2.1)) * onset * u_dpr / mass;
+
+      vel += vec2(gustX, gustY) * dt;
+      vel *= pow(0.96, dt * 60.0);
+      pos += vel * dt;
+
+      float fade = 1.0 - smooth01(localP);
+      alpha = fade * fade;
+      energy = clamp(onset * 0.42, 0.0, 0.55);
+    }
+  } else {
+    // PHASE 3: REFORM PAUSE (SILENT RESET AT BORDERS)
+    pos = a_border;
+    vel = vec2(0.0);
+    alpha = 0.0;
+    energy = 0.0;
+  }
+
+  v_pos = pos;
+  v_vel = vel;
+  v_vis = vec2(alpha, energy);
+}
+`;
+
+        const physicsFS = `#version 300 es
+precision lowp float;
+void main() { discard; }
+`;
+
+        // --- Particle Render Shaders (MRT: Crisp Scene + Selective Glow) ---
+        const renderVS = `#version 300 es
+precision highp float;
+
+layout(location = 0) in vec2 a_pos;
+layout(location = 1) in vec2 a_vis;   // x=alpha, y=energy
+layout(location = 2) in vec3 a_color;
+
+uniform vec2  u_res;
+uniform float u_pointSize;
+uniform float u_endBlur;
+uniform float u_dpr;
+
+out vec3  v_color;
+out float v_alpha;
+out float v_energy;
+
+void main() {
+  vec2 ndc = (a_pos / u_res) * 2.0 - 1.0;
+  ndc.y = -ndc.y;
+  gl_Position = vec4(ndc, 0.0, 1.0);
+
+  v_color = a_color;
+  v_alpha = a_vis.x;
+  v_energy = a_vis.y;
+
+  // Keep particles razor-sharp during normal play & crisp disappear; only expand if user enables Disappear Blur
+  float blurGrow = u_endBlur * 10.0 * u_dpr;
+  float sparkGrow = v_energy * 0.65 * u_dpr;
+  float sz = clamp(u_pointSize + sparkGrow + blurGrow, 1.0, 28.0);
+  gl_PointSize = v_alpha > 0.004 ? sz : 0.0;
+}
+`;
+
+        const renderFS = `#version 300 es
+precision highp float;
+
+in vec3  v_color;
+in float v_alpha;
+in float v_energy;
+
+uniform float u_endBlur;
+
+layout(location = 0) out vec4 outScene;
+layout(location = 1) out vec4 outBloom;
+
+void main() {
+  if (v_alpha <= 0.004) discard;
+
+  vec2 uv = gl_PointCoord - 0.5;
+  float r2 = dot(uv, uv);
+
+  float shape = 1.0;
+  if (u_endBlur > 0.01) {
+    // Soft bokeh disc only when user explicitly dials up Disappear Blur
+    if (r2 > 0.25) discard;
+    shape = exp(-r2 * mix(10.0, 4.5, u_endBlur));
+  } else {
+    // Crisp high-definition pixel-lock dot
+    shape = smoothstep(0.32, 0.14, r2);
+  }
+
+  float a = v_alpha * shape;
+  vec3 col = v_color * (1.0 + v_energy * 0.22);
+
+  outScene = vec4(col * a, a);
+
+  // Selective bloom: bright relativistic plasma highlights + energetic fast-moving sparks
+  float luma = dot(v_color, vec3(0.299, 0.587, 0.114));
+  float brightMask = smoothstep(0.56, 0.95, luma);
+  float bloomWeight = max(brightMask * 0.72, v_energy * 0.55) * a;
+  outBloom = vec4(v_color * bloomWeight, bloomWeight);
+}
+`;
+
+        // --- Fullscreen Quad VS + Separable Gaussian Blur FS + Composite FS ---
+        const quadVS = `#version 300 es
+precision highp float;
+out vec2 v_uv;
+void main() {
+  vec2 pos = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
+  v_uv = pos * 0.5 + 0.5;
+  gl_Position = vec4(pos, 0.0, 1.0);
+}
+`;
+
+        const blurFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_dir;
+out vec4 fragColor;
+
+void main() {
+  vec4 acc = texture(u_tex, v_uv) * 0.227027;
+  acc += texture(u_tex, v_uv + u_dir * 1.384615) * 0.316216;
+  acc += texture(u_tex, v_uv - u_dir * 1.384615) * 0.316216;
+  acc += texture(u_tex, v_uv + u_dir * 3.230769) * 0.070270;
+  acc += texture(u_tex, v_uv - u_dir * 3.230769) * 0.070270;
+  fragColor = acc;
+}
+`;
+
+        const compositeFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+
+uniform sampler2D u_sceneTex;
+uniform sampler2D u_bloomTex;
+uniform sampler2D u_blurSceneTex;
+uniform float u_glowOn;
+uniform float u_endBlur;
+uniform float u_edgeSoftness;
+uniform float u_edgeMaskFactor;
+uniform vec4  u_imgRectUV; // x0, y0, x1, y1
+
+out vec4 fragColor;
+
+void main() {
+  vec4 crisp = texture(u_sceneTex, v_uv);
+  vec4 soft  = texture(u_blurSceneTex, v_uv);
+
+  // Optional bottom & outer edge softness mask (0% by default)
+  float edgeFade = 1.0;
+  float edgeBlurMix = 0.0;
+  if (u_edgeSoftness > 0.005 && u_edgeMaskFactor > 0.005) {
+    float spanX = max(0.001, u_imgRectUV.z - u_imgRectUV.x);
+    float spanY = max(0.001, u_imgRectUV.w - u_imgRectUV.y);
+    float normX = (v_uv.x - u_imgRectUV.x) / spanX;
+    float normY = (v_uv.y - u_imgRectUV.y) / spanY;
+
+    float botBand = 0.26 * u_edgeSoftness;
+    float sideBand = 0.14 * u_edgeSoftness;
+    float fBot = smoothstep(0.0, max(0.001, botBand), normY);
+    float fTop = smoothstep(0.0, max(0.001, sideBand), 1.0 - normY);
+    float fL   = smoothstep(0.0, max(0.001, sideBand), normX);
+    float fR   = smoothstep(0.0, max(0.001, sideBand), 1.0 - normX);
+    float mask = fBot * fTop * fL * fR;
+
+    edgeFade = mix(1.0, mask, u_edgeMaskFactor);
+    edgeBlurMix = (1.0 - mask) * u_edgeSoftness * u_edgeMaskFactor;
+  }
+
+  float totalBlur = clamp(u_endBlur + edgeBlurMix, 0.0, 1.0);
+  vec3 baseCol = mix(crisp.rgb, soft.rgb, totalBlur);
+
+  if (u_glowOn > 0.5) {
+    vec3 bloom = texture(u_bloomTex, v_uv).rgb;
+    baseCol += bloom * 0.78;
+  }
+
+  baseCol *= edgeFade;
+
+  // Gentle highlight roll-off so white-hot photon ring never clips harshly
+  baseCol = baseCol / (1.0 + baseCol * 0.16);
+  fragColor = vec4(baseCol, 1.0);
+}
+`;
+
+        const physProg = createProgram(physicsVS, physicsFS, ['v_pos', 'v_vel', 'v_vis']);
+        const renProg  = createProgram(renderVS, renderFS, null);
+        const blurProg = createProgram(quadVS, blurFS, null);
+        const compProg = createProgram(quadVS, compFS, null);
+
+        // Uniform locations
+        const pU = {
+          dt: gl.getUniformLocation(physProg, 'u_dt'),
+          time: gl.getUniformLocation(physProg, 'u_time'),
+          res: gl.getUniformLocation(physProg, 'u_res'),
+          phase: gl.getUniformLocation(physProg, 'u_phase'),
+          phaseProg: gl.getUniformLocation(physProg, 'u_phaseProg'),
+          disappearStyle: gl.getUniformLocation(physProg, 'u_disappearStyle'),
+          cycleSeed: gl.getUniformLocation(physProg, 'u_cycleSeed'),
+          windOverride: gl.getUniformLocation(physProg, 'u_windOverride'),
+          gust: gl.getUniformLocation(physProg, 'u_gust'),
+          pointerActive: gl.getUniformLocation(physProg, 'u_pointerActive'),
+          pointerPos: gl.getUniformLocation(physProg, 'u_pointerPos'),
+          cursorRadius: gl.getUniformLocation(physProg, 'u_cursorRadius'),
+          cursorMode: gl.getUniformLocation(physProg, 'u_cursorMode'),
+          dpr: gl.getUniformLocation(physProg, 'u_dpr')
+        };
+
+        const rU = {
+          res: gl.getUniformLocation(renProg, 'u_res'),
+          pointSize: gl.getUniformLocation(renProg, 'u_pointSize'),
+          endBlur: gl.getUniformLocation(renProg, 'u_endBlur'),
+          dpr: gl.getUniformLocation(renProg, 'u_dpr')
+        };
+
+        const bU = {
+          tex: gl.getUniformLocation(blurProg, 'u_tex'),
+          dir: gl.getUniformLocation(blurProg, 'u_dir')
+        };
+
+        const cU = {
+          sceneTex: gl.getUniformLocation(compProg, 'u_sceneTex'),
+          bloomTex: gl.getUniformLocation(compProg, 'u_bloomTex'),
+          blurSceneTex: gl.getUniformLocation(compProg, 'u_blurSceneTex'),
+          glowOn: gl.getUniformLocation(compProg, 'u_glowOn'),
+          endBlur: gl.getUniformLocation(compProg, 'u_endBlur'),
+          edgeSoftness: gl.getUniformLocation(compProg, 'u_edgeSoftness'),
+          edgeMaskFactor: gl.getUniformLocation(compProg, 'u_edgeMaskFactor'),
+          imgRectUV: gl.getUniformLocation(compProg, 'u_imgRectUV')
+        };
+
+        // Particle buffers & VAOs
+        const staticVBO = gl.createBuffer();
+        const stateVBO = [gl.createBuffer(), gl.createBuffer()];
+        const physVAO = [gl.createVertexArray(), gl.createVertexArray()];
+        const renVAO  = [gl.createVertexArray(), gl.createVertexArray()];
+        const quadVAO = gl.createVertexArray();
+        const tf = gl.createTransformFeedback();
+
+        // Setup VAOs for both ping-pong indices
+        const staticStride = 11 * 4;
+        const dynStride = 6 * 4;
+
+        for (let i = 0; i < 2; i++) {
+          // Physics VAO reads staticVBO + stateVBO[i]
+          gl.bindVertexArray(physVAO[i]);
+          gl.bindBuffer(gl.ARRAY_BUFFER, staticVBO);
+          gl.enableVertexAttribArray(0);
+          gl.vertexAttribPointer(0, 2, gl.FLOAT, false, staticStride, 0);
+          gl.enableVertexAttribArray(1);
+          gl.vertexAttribPointer(1, 2, gl.FLOAT, false, staticStride, 8);
+          gl.enableVertexAttribArray(2);
+          gl.vertexAttribPointer(2, 3, gl.FLOAT, false, staticStride, 16);
+          gl.enableVertexAttribArray(3);
+          gl.vertexAttribPointer(3, 4, gl.FLOAT, false, staticStride, 28);
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, stateVBO[i]);
+          gl.enableVertexAttribArray(4);
+          gl.vertexAttribPointer(4, 2, gl.FLOAT, false, dynStride, 0);
+          gl.enableVertexAttribArray(5);
+          gl.vertexAttribPointer(5, 2, gl.FLOAT, false, dynStride, 8);
+          gl.enableVertexAttribArray(6);
+          gl.vertexAttribPointer(6, 2, gl.FLOAT, false, dynStride, 16);
+
+          // Render VAO reads stateVBO[i] (pos, vis) + staticVBO (color)
+          gl.bindVertexArray(renVAO[i]);
+          gl.bindBuffer(gl.ARRAY_BUFFER, stateVBO[i]);
+          gl.enableVertexAttribArray(0);
+          gl.vertexAttribPointer(0, 2, gl.FLOAT, false, dynStride, 0);
+          gl.enableVertexAttribArray(1);
+          gl.vertexAttribPointer(1, 2, gl.FLOAT, false, dynStride, 16);
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, staticVBO);
+          gl.enableVertexAttribArray(2);
+          gl.vertexAttribPointer(2, 3, gl.FLOAT, false, staticStride, 16);
+        }
+        gl.bindVertexArray(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        // FBO & Textures for MRT scene, selective bloom, and optional optical blur
+        function makeTexture(w, h) {
+          const tex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          return tex;
+        }
+
+        function makeFBO(textures) {
+          const fbo = gl.createFramebuffer();
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          const bufs = [];
+          for (let i = 0; i < textures.length; i++) {
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, textures[i], 0);
+            bufs.push(gl.COLOR_ATTACHMENT0 + i);
+          }
+          gl.drawBuffers(bufs);
+          const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          if (!ok) {
+            gl.deleteFramebuffer(fbo);
+            return null;
+          }
+          return fbo;
+        }
+
+        let fboW = 2, fboH = 2, qW = 2, qH = 2;
+        let sceneTex = null, bloomSrcTex = null, sceneFBO = null;
+        let bloomTexA = null, bloomTexB = null, bloomFboA = null, bloomFboB = null;
+        let blurTexA = null, blurTexB = null, blurFboA = null, blurFboB = null;
+        let mrtSupported = true;
+
+        function destroyFBOs() {
+          const texList = [sceneTex, bloomSrcTex, bloomTexA, bloomTexB, blurTexA, blurTexB];
+          texList.forEach((t) => { if (t) gl.deleteTexture(t); });
+          const fboList = [sceneFBO, bloomFboA, bloomFboB, blurFboA, blurFboB];
+          fboList.forEach((f) => { if (f) gl.deleteFramebuffer(f); });
+          sceneTex = bloomSrcTex = bloomTexA = bloomTexB = blurTexA = blurTexB = null;
+          sceneFBO = bloomFboA = bloomFboB = blurFboA = blurFboB = null;
+        }
+
+        function rebuildFBOs(w, h) {
+          destroyFBOs();
+          fboW = Math.max(2, w);
+          fboH = Math.max(2, h);
+          qW = Math.max(2, Math.round(fboW / 4));
+          qH = Math.max(2, Math.round(fboH / 4));
+
+          sceneTex = makeTexture(fboW, fboH);
+          bloomSrcTex = makeTexture(fboW, fboH);
+          sceneFBO = makeFBO([sceneTex, bloomSrcTex]);
+
+          bloomTexA = makeTexture(qW, qH);
+          bloomTexB = makeTexture(qW, qH);
+          bloomFboA = makeFBO([bloomTexA]);
+          bloomFboB = makeFBO([bloomTexB]);
+
+          blurTexA = makeTexture(qW, qH);
+          blurTexB = makeTexture(qW, qH);
+          blurFboA = makeFBO([blurTexA]);
+          blurFboB = makeFBO([blurTexB]);
+
+          mrtSupported = !!(sceneFBO && bloomFboA && bloomFboB && blurFboA && blurFboB);
+        }
+
+        let count = 0;
+        let readIdx = 0;
+        let savedInitialState = null;
+
+        function runBlurPass(srcTex, dstFbo, dstW, dstH, dx, dy) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, dstFbo);
+          gl.viewport(0, 0, dstW, dstH);
+          gl.useProgram(blurProg);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, srcTex);
+          gl.uniform1i(bU.tex, 0);
+          gl.uniform2f(bU.dir, dx, dy);
+          gl.bindVertexArray(quadVAO);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+
+        return {
+          modeName: 'GPU WebGL2',
+
+          resize(w, h) {
+            rebuildFBOs(w, h);
+          },
+
+          uploadParticles(staticData, initialStateData, particleCount) {
+            count = particleCount;
+            readIdx = 0;
+            savedInitialState = new Float32Array(initialStateData);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, staticVBO);
+            gl.bufferData(gl.ARRAY_BUFFER, staticData, gl.STATIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, stateVBO[0]);
+            gl.bufferData(gl.ARRAY_BUFFER, initialStateData, gl.DYNAMIC_COPY);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, stateVBO[1]);
+            gl.bufferData(gl.ARRAY_BUFFER, initialStateData.byteLength, gl.DYNAMIC_COPY);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          },
+
+          triggerBorderSpawn() {
+            if (!savedInitialState || count === 0) return;
+            readIdx = 0;
+            gl.bindBuffer(gl.ARRAY_BUFFER, stateVBO[0]);
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, savedInitialState);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          },
+
+          stepPhysics(dt, params) {
+            if (count === 0) return;
+            const writeIdx = 1 - readIdx;
+
+            gl.useProgram(physProg);
+            gl.uniform1f(pU.dt, dt);
+            gl.uniform1f(pU.time, params.simTime);
+            gl.uniform2f(pU.res, params.resW, params.resH);
+            gl.uniform1i(pU.phase, params.phase);
+            gl.uniform1f(pU.phaseProg, params.phaseProgress);
+            gl.uniform1i(pU.disappearStyle, params.disappearStyle);
+            gl.uniform1f(pU.cycleSeed, params.cycleSeed);
+            gl.uniform1f(pU.windOverride, params.windOverride ? 1.0 : 0.0);
+            gl.uniform1f(pU.gust, params.gust);
+            gl.uniform1f(pU.pointerActive, params.pointerActive ? 1.0 : 0.0);
+            gl.uniform2f(pU.pointerPos, params.pointerPhysX, params.pointerPhysY);
+            gl.uniform1f(pU.cursorRadius, params.cursorRadiusPhys);
+            gl.uniform1i(pU.cursorMode, params.cursorMode === 'vortex' ? 1 : 0);
+            gl.uniform1f(pU.dpr, params.dpr);
+
+            gl.bindVertexArray(physVAO[readIdx]);
+            gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, tf);
+            gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, stateVBO[writeIdx]);
+
+            gl.enable(gl.RASTERIZER_DISCARD);
+            gl.beginTransformFeedback(gl.POINTS);
+            gl.drawArrays(gl.POINTS, 0, count);
+            gl.endTransformFeedback();
+            gl.disable(gl.RASTERIZER_DISCARD);
+
+            gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
+            gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+            gl.bindVertexArray(null);
+
+            readIdx = writeIdx;
+          },
+
+          render(params) {
+            const pointSize = Math.max(1.0, params.sampleStride * 1.16 * params.pointSizeMult);
+
+            if (!mrtSupported) {
+              // Direct screen render fallback if MRT FBO failed on a constrained driver
+              gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+              gl.viewport(0, 0, params.resW, params.resH);
+              gl.clearColor(0, 0, 0, 1);
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              if (count === 0) return;
+
+              gl.enable(gl.BLEND);
+              gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+              gl.useProgram(renProg);
+              gl.uniform2f(rU.res, params.resW, params.resH);
+              gl.uniform1f(rU.pointSize, pointSize);
+              gl.uniform1f(rU.endBlur, params.endBlur);
+              gl.uniform1f(rU.dpr, params.dpr);
+              gl.bindVertexArray(renVAO[readIdx]);
+              gl.drawArrays(gl.POINTS, 0, count);
+              gl.bindVertexArray(null);
+              gl.disable(gl.BLEND);
+              return;
+            }
+
+            // Pass 1: Render crisp particles into MRT Scene + Selective Bloom FBO
+            gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+            gl.viewport(0, 0, fboW, fboH);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            if (count > 0) {
+              gl.enable(gl.BLEND);
+              gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+              gl.useProgram(renProg);
+              gl.uniform2f(rU.res, params.resW, params.resH);
+              gl.uniform1f(rU.pointSize, pointSize);
+              gl.uniform1f(rU.endBlur, params.endBlur);
+              gl.uniform1f(rU.dpr, params.dpr);
+              gl.bindVertexArray(renVAO[readIdx]);
+              gl.drawArrays(gl.POINTS, 0, count);
+              gl.bindVertexArray(null);
+              gl.disable(gl.BLEND);
+            }
+
+            // Pass 2: Quarter-res separable Gaussian bloom (only if Glow ON)
+            if (params.glowOn) {
+              runBlurPass(bloomSrcTex, bloomFboA, qW, qH, 1.4 / qW, 0.0);
+              runBlurPass(bloomTexA, bloomFboB, qW, qH, 0.0, 1.4 / qH);
+              runBlurPass(bloomTexB, bloomFboA, qW, qH, 2.2 / qW, 0.0);
+              runBlurPass(bloomTexA, bloomFboB, qW, qH, 0.0, 2.2 / qH);
+            }
+
+            // Pass 3: Optional optical blur for Disappear Blur or Edge Softness (skipped when both 0%)
+            const needSceneBlur = params.endBlur > 0.005 || (params.edgeSoftness > 0.005 && params.edgeMaskFactor > 0.005);
+            if (needSceneBlur) {
+              const rad = 1.2 + Math.max(params.endBlur, params.edgeSoftness) * 3.8;
+              runBlurPass(sceneTex, blurFboA, qW, qH, rad / qW, 0.0);
+              runBlurPass(blurTexA, blurFboB, qW, qH, 0.0, rad / qH);
+            }
+
+            // Pass 4: Final composite to screen
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, params.resW, params.resH);
+            gl.useProgram(compProg);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+            gl.uniform1i(cU.sceneTex, 0);
+
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, bloomTexB);
+            gl.uniform1i(cU.bloomTex, 1);
+
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, needSceneBlur ? blurTexB : sceneTex);
+            gl.uniform1i(cU.blurSceneTex, 2);
+
+            gl.uniform1f(cU.glowOn, params.glowOn ? 1.0 : 0.0);
+            gl.uniform1f(cU.endBlur, params.endBlur);
+            gl.uniform1f(cU.edgeSoftness, params.edgeSoftness);
+            gl.uniform1f(cU.edgeMaskFactor, params.edgeMaskFactor);
+            gl.uniform4f(
+              cU.imgRectUV,
+              params.imgRectUV[0],
+              params.imgRectUV[1],
+              params.imgRectUV[2],
+              params.imgRectUV[3]
+            );
+
+            gl.bindVertexArray(quadVAO);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            gl.bindVertexArray(null);
+
+            // Unbind textures cleanly to prevent driver feedback warnings
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+          },
+
+          dispose() {
+            destroyFBOs();
+            gl.deleteBuffer(staticVBO);
+            gl.deleteBuffer(stateVBO[0]);
+            gl.deleteBuffer(stateVBO[1]);
+            gl.deleteVertexArray(physVAO[0]);
+            gl.deleteVertexArray(physVAO[1]);
+            gl.deleteVertexArray(renVAO[0]);
+            gl.deleteVertexArray(renVAO[1]);
+            gl.deleteVertexArray(quadVAO);
+            gl.deleteTransformFeedback(tf);
+            gl.deleteProgram(physProg);
+            gl.deleteProgram(renProg);
+            gl.deleteProgram(blurProg);
+            gl.deleteProgram(compProg);
+          }
+        };
+      }
+
+      /* -----------------------------------------------------------------------
+         4. SHARED CPU PHYSICS ENGINE (FOR WEBGL1 & CANVAS2D FALLBACKS)
+         ----------------------------------------------------------------------- */
+      function smooth01(x) {
+        const c = x < 0 ? 0 : x > 1 ? 1 : x;
+        return c * c * (3.0 - 2.0 * c);
+      }
+
+      function createCpuPhysicsState() {
+        return {
+          count: 0,
+          homeX: null,
+          homeY: null,
+          borderX: null,
+          borderY: null,
+          colR: null,
+          colG: null,
+          colB: null,
+          mass: null,
+          phase: null,
+          delay: null,
+          wave: null,
+          posX: null,
+          posY: null,
+          velX: null,
+          velY: null,
+          alpha: null,
+          energy: null,
+
+          load(staticData, initialStateData, particleCount) {
+            this.count = particleCount;
+            this.homeX = new Float32Array(particleCount);
+            this.homeY = new Float32Array(particleCount);
+            this.borderX = new Float32Array(particleCount);
+            this.borderY = new Float32Array(particleCount);
+            this.colR = new Float32Array(particleCount);
+            this.colG = new Float32Array(particleCount);
+            this.colB = new Float32Array(particleCount);
+            this.mass = new Float32Array(particleCount);
+            this.phase = new Float32Array(particleCount);
+            this.delay = new Float32Array(particleCount);
+            this.wave = new Float32Array(particleCount);
+
+            this.posX = new Float32Array(particleCount);
+            this.posY = new Float32Array(particleCount);
+            this.velX = new Float32Array(particleCount);
+            this.velY = new Float32Array(particleCount);
+            this.alpha = new Float32Array(particleCount);
+            this.energy = new Float32Array(particleCount);
+
+            for (let i = 0; i < particleCount; i++) {
+              const s = i * 11;
+              this.homeX[i] = staticData[s];
+              this.homeY[i] = staticData[s + 1];
+              this.borderX[i] = staticData[s + 2];
+              this.borderY[i] = staticData[s + 3];
+              this.colR[i] = staticData[s + 4];
+              this.colG[i] = staticData[s + 5];
+              this.colB[i] = staticData[s + 6];
+              this.mass[i] = staticData[s + 7];
+              this.phase[i] = staticData[s + 8];
+              this.delay[i] = staticData[s + 9];
+              this.wave[i] = staticData[s + 10];
+
+              const d = i * 6;
+              this.posX[i] = initialStateData[d];
+              this.posY[i] = initialStateData[d + 1];
+              this.velX[i] = 0;
+              this.velY[i] = 0;
+              this.alpha[i] = 0;
+              this.energy[i] = 0;
+            }
+          },
+
+          resetToBorders() {
+            for (let i = 0; i < this.count; i++) {
+              this.posX[i] = this.borderX[i];
+              this.posY[i] = this.borderY[i];
+              this.velX[i] = 0;
+              this.velY[i] = 0;
+              this.alpha[i] = 0;
+              this.energy[i] = 0;
+            }
+          },
+
+          step(dt, params) {
+            const n = this.count;
+            if (n === 0) return;
+
+            const stepDt = Math.min(dt, 0.05);
+            const phase = params.phase;
+            const prog = params.phaseProgress;
+            const dpr = params.dpr;
+            const cx = params.resW * 0.5;
+            const cy = params.resH * 0.5;
+            const t = params.simTime;
+            const seedShift = params.cycleSeed * 0.713;
+
+            const homeX = this.homeX, homeY = this.homeY;
+            const borderX = this.borderX, borderY = this.borderY;
+            const massArr = this.mass, phaseArr = this.phase, delayArr = this.delay, waveArr = this.wave;
+            const posX = this.posX, posY = this.posY, velX = this.velX, velY = this.velY;
+            const alphaArr = this.alpha, energyArr = this.energy;
+
+            if (phase === PHASE_ASSEMBLE) {
+              for (let i = 0; i < n; i++) {
+                const del = delayArr[i];
+                const denom = Math.max(0.08, 1.0 - del * 0.72);
+                const localT = Math.max(0, Math.min(1, (prog - del * 0.72) / denom));
+
+                if (localT <= 0.001) {
+                  posX[i] = borderX[i];
+                  posY[i] = borderY[i];
+                  velX[i] = 0;
+                  velY[i] = 0;
+                  alphaArr[i] = 0;
+                  energyArr[i] = 0;
+                  continue;
+                }
+
+                const dx = homeX[i] - posX[i];
+                const dy = homeY[i] - posY[i];
+                const dist = Math.hypot(dx, dy) + 1e-4;
+                const m = massArr[i];
+                const ph = phaseArr[i] + seedShift;
+
+                const pull = (5.2 + 16.8 * localT * localT) / m;
+                let ax = dx * pull;
+                let ay = dy * pull;
+
+                const swirlEnv = Math.sin(localT * Math.PI) * (1.0 - localT);
+                const swirlSign = (i & 1) === 0 ? 1.0 : -1.0;
+                const sw = swirlSign * swirlEnv * (420.0 * dpr) / m;
+                ax += (-dy / dist) * sw;
+                ay += (dx / dist) * sw;
+
+                const damp = Math.pow(0.84 - 0.22 * localT, stepDt * 60.0);
+                velX[i] = (velX[i] + ax * stepDt) * damp;
+                velY[i] = (velY[i] + ay * stepDt) * damp;
+                posX[i] += velX[i] * stepDt;
+                posY[i] += velY[i] * stepDt;
+
+                if (localT > 0.86) {
+                  const snap = smooth01((localT - 0.86) / 0.14);
+                  posX[i] += (homeX[i] - posX[i]) * snap * 0.55;
+                  posY[i] += (homeY[i] - posY[i]) * snap * 0.55;
+                  velX[i] *= (1.0 - snap * 0.65);
+                  velY[i] *= (1.0 - snap * 0.65);
+                }
+
+                alphaArr[i] = smooth01(localT * 3.2);
+                energyArr[i] = Math.min(1.0, Math.hypot(velX[i], velY[i]) / (460.0 * dpr));
+              }
+            } else if (phase === PHASE_HOLD) {
+              const windOn = params.windOverride;
+              const springK = windOn ? 2.6 : 13.5;
+              const damp = Math.pow(windOn ? 0.91 : 0.82, stepDt * 60.0);
+              const ptrOn = params.pointerActive;
+              const px = params.pointerPhysX;
+              const py = params.pointerPhysY;
+              const rad = params.cursorRadiusPhys;
+              const radSq = rad * rad;
+              const isVortex = params.cursorMode === 'vortex';
+
+              for (let i = 0; i < n; i++) {
+                let ax = (homeX[i] - posX[i]) * springK;
+                let ay = (homeY[i] - posY[i]) * springK;
+                const m = massArr[i];
+
+                if (windOn) {
+                  const ph = phaseArr[i] + seedShift;
+                  ax += (290.0 * params.gust + 65.0 * Math.sin(posY[i] * 0.014 + t * 2.7 + ph)) * dpr / m;
+                  ay += (52.0 * Math.cos(posX[i] * 0.012 + t * 2.1 + ph)) * dpr / m;
+                }
+
+                if (ptrOn) {
+                  const dx = posX[i] - px;
+                  const dy = posY[i] - py;
+                  const dSq = dx * dx + dy * dy;
+                  if (dSq < radSq && dSq > 0.0001) {
+                    const d = Math.sqrt(dSq);
+                    const f = 1.0 - d / rad;
+                    const f2 = f * f * dpr / m;
+                    const nx = dx / d;
+                    const ny = dy / d;
+                    if (!isVortex) {
+                      ax += nx * 3600.0 * f2;
+                      ay += ny * 3600.0 * f2;
+                    } else {
+                      ax += (-ny * 2900.0 - nx * 950.0) * f2;
+                      ay += (nx * 2900.0 - ny * 950.0) * f2;
+                    }
+                  }
+                }
+
+                velX[i] = (velX[i] + ax * stepDt) * damp;
+                velY[i] = (velY[i] + ay * stepDt) * damp;
+                posX[i] += velX[i] * stepDt;
+                posY[i] += velY[i] * stepDt;
+                alphaArr[i] = 1.0;
+                energyArr[i] = Math.min(1.0, Math.hypot(velX[i], velY[i]) / (420.0 * dpr));
+              }
+            } else if (phase === PHASE_DISAPPEAR) {
+              const style = params.disappearStyle;
+              const damp = Math.pow(style === 1 ? 0.93 : 0.955, stepDt * 60.0);
+
+              for (let i = 0; i < n; i++) {
+                const m = massArr[i];
+                const ph = phaseArr[i] + seedShift;
+                const del = delayArr[i];
+
+                if (style === 0) {
+                  const localP = Math.max(0, Math.min(1, (prog - del * 0.42) / Math.max(0.15, 1.0 - del * 0.42)));
+                  const onset = smooth01(localP * 1.4);
+                  const fx = posX[i] - cx;
+                  const fy = posY[i] - cy;
+                  const d = Math.hypot(fx, fy) + 0.001;
+                  const rx = fx / d;
+                  const ry = fy / d;
+
+                  const driftX = rx * (155 + 90 * Math.sin(ph)) - ry * (120 * Math.cos(ph * 1.7));
+                  const driftY = ry * (155 + 90 * Math.sin(ph)) + rx * (120 * Math.cos(ph * 1.7)) - 34;
+
+                  velX[i] = (velX[i] + (driftX * onset * dpr / m) * stepDt) * damp;
+                  velY[i] = (velY[i] + (driftY * onset * dpr / m) * stepDt) * damp;
+                  posX[i] += velX[i] * stepDt;
+                  posY[i] += velY[i] * stepDt;
+
+                  const fade = 1.0 - smooth01(localP);
+                  alphaArr[i] = fade * fade;
+                  energyArr[i] = onset * 0.32;
+                } else if (style === 1) {
+                  const localP = Math.max(0, Math.min(1, (prog - del * 0.35) / Math.max(0.15, 1.0 - del * 0.35)));
+                  const accel = smooth01(localP);
+                  const ax = (borderX[i] - posX[i]) * (2.6 + 6.5 * accel) / m;
+                  const ay = (borderY[i] - posY[i]) * (2.6 + 6.5 * accel) / m;
+
+                  velX[i] = (velX[i] + ax * stepDt) * damp;
+                  velY[i] = (velY[i] + ay * stepDt) * damp;
+                  posX[i] += velX[i] * stepDt;
+                  posY[i] += velY[i] * stepDt;
+
+                  const fade = 1.0 - smooth01(Math.max(0, Math.min(1, (localP - 0.12) / 0.88)));
+                  alphaArr[i] = fade * fade;
+                  energyArr[i] = accel * 0.45;
+                } else {
+                  const stagger = waveArr[i] * 0.42 + del * 0.18;
+                  const localP = Math.max(0, Math.min(1, (prog - stagger) / Math.max(0.15, 1.0 - stagger)));
+                  const onset = smooth01(localP * 1.35);
+
+                  const ax = (420 + 180 * Math.sin(ph + t * 2.4)) * onset * dpr / m;
+                  const ay = (-75 + 130 * Math.cos(posX[i] * 0.011 + ph + t * 2.1)) * onset * dpr / m;
+
+                  velX[i] = (velX[i] + ax * stepDt) * damp;
+                  velY[i] = (velY[i] + ay * stepDt) * damp;
+                  posX[i] += velX[i] * stepDt;
+                  posY[i] += velY[i] * stepDt;
+
+                  const fade = 1.0 - smooth01(localP);
+                  alphaArr[i] = fade * fade;
+                  energyArr[i] = onset * 0.42;
+                }
+              }
+            } else {
+              this.resetToBorders();
+            }
+          }
+        };
+      }
+
+      /* -----------------------------------------------------------------------
+         5. WEBGL1 FALLBACK ENGINE (CPU PHYSICS + GPU POINT RASTERIZER)
+         ----------------------------------------------------------------------- */
+      function createWebGL1Engine() {
+        const gl = canvas.getContext('webgl', {
+          alpha: false,
+          antialias: false,
+          depth: false,
+          stencil: false,
+          powerPreference: 'high-performance'
+        });
+        if (!gl) return null;
+
+        const vsSrc = `
+          attribute vec2 a_pos;
+          attribute vec3 a_color;
+          attribute float a_alpha;
+          uniform vec2 u_res;
+          uniform float u_pointSize;
+          varying vec3 v_color;
+          varying float v_alpha;
+          void main() {
+            vec2 ndc = (a_pos / u_res) * 2.0 - 1.0;
+            ndc.y = -ndc.y;
+            gl_Position = vec4(ndc, 0.0, 1.0);
+            gl_PointSize = a_alpha > 0.004 ? u_pointSize : 0.0;
+            v_color = a_color;
+            v_alpha = a_alpha;
+          }
+        `;
+
+        const fsSrc = `
+          precision mediump float;
+          varying vec3 v_color;
+          varying float v_alpha;
+          void main() {
+            if (v_alpha <= 0.004) discard;
+            vec2 uv = gl_PointCoord - 0.5;
+            float r2 = dot(uv, uv);
+            float s = smoothstep(0.32, 0.14, r2);
+            gl_FragColor = vec4(v_color * v_alpha * s, v_alpha * s);
+          }
+        `;
+
+        function compile(type, src) {
+          const sh = gl.createShader(type);
+          gl.shaderSource(sh, src);
+          gl.compileShader(sh);
+          if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+            throw new Error(gl.getShaderInfoLog(sh));
+          }
+          return sh;
+        }
+
+        const prog = gl.createProgram();
+        gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc));
+        gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          throw new Error(gl.getProgramInfoLog(prog));
+        }
+
+        const aPos = gl.getAttribLocation(prog, 'a_pos');
+        const aCol = gl.getAttribLocation(prog, 'a_color');
+        const aAlp = gl.getAttribLocation(prog, 'a_alpha');
+        const uRes = gl.getUniformLocation(prog, 'u_res');
+        const uSize = gl.getUniformLocation(prog, 'u_pointSize');
+
+        const vbo = gl.createBuffer();
+        const cpu = createCpuPhysicsState();
+        let interleaved = new Float32Array(0);
+
+        return {
+          modeName: 'GPU WebGL1',
+          resize() {},
+          uploadParticles(staticData, initialStateData, count) {
+            cpu.load(staticData, initialStateData, count);
+            interleaved = new Float32Array(count * 6);
+          },
+          triggerBorderSpawn() {
+            cpu.resetToBorders();
+          },
+          stepPhysics(dt, params) {
+            cpu.step(dt, params);
+          },
+          render(params) {
+            gl.viewport(0, 0, params.resW, params.resH);
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            if (cpu.count === 0) return;
+
+            for (let i = 0; i < cpu.count; i++) {
+              const o = i * 6;
+              interleaved[o] = cpu.posX[i];
+              interleaved[o + 1] = cpu.posY[i];
+              interleaved[o + 2] = cpu.colR[i];
+              interleaved[o + 3] = cpu.colG[i];
+              interleaved[o + 4] = cpu.colB[i];
+              interleaved[o + 5] = cpu.alpha[i];
+            }
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.useProgram(prog);
+            gl.uniform2f(uRes, params.resW, params.resH);
+            gl.uniform1f(uSize, Math.max(1.0, params.sampleStride * 1.18 * params.pointSizeMult));
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, interleaved, gl.DYNAMIC_DRAW);
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 24, 0);
+            gl.enableVertexAttribArray(aCol);
+            gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, 24, 8);
+            gl.enableVertexAttribArray(aAlp);
+            gl.vertexAttribPointer(aAlp, 1, gl.FLOAT, false, 24, 20);
+
+            gl.drawArrays(gl.POINTS, 0, cpu.count);
+            gl.disable(gl.BLEND);
+          },
+          dispose() {
+            gl.deleteBuffer(vbo);
+            gl.deleteProgram(prog);
+          }
+        };
+      }
+
+      /* -----------------------------------------------------------------------
+         6. CANVAS2D DIRECT PIXEL-BUFFER FALLBACK ENGINE
+         ----------------------------------------------------------------------- */
+      function createCanvas2DEngine() {
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) return null;
+
+        const glowCanvas = document.createElement('canvas');
+        const glowCtx = glowCanvas.getContext('2d');
+        const cpu = createCpuPhysicsState();
+
+        let imgData = null;
+        let pixels32 = null;
+        let w = 1, h = 1;
+
+        return {
+          modeName: 'CPU 2D',
+          resize(newW, newH) {
+            w = Math.max(1, newW);
+            h = Math.max(1, newH);
+            imgData = ctx.createImageData(w, h);
+            pixels32 = new Uint32Array(imgData.data.buffer);
+            glowCanvas.width = Math.max(2, (w / 5) | 0);
+            glowCanvas.height = Math.max(2, (h / 5) | 0);
+          },
+          uploadParticles(staticData, initialStateData, count) {
+            cpu.load(staticData, initialStateData, count);
+          },
+          triggerBorderSpawn() {
+            cpu.resetToBorders();
+          },
+          stepPhysics(dt, params) {
+            cpu.step(dt, params);
+          },
+          render(params) {
+            if (!pixels32) return;
+            pixels32.fill(0xff000000);
+
+            const n = cpu.count;
+            const px = cpu.posX, py = cpu.posY;
+            const rA = cpu.colR, gA = cpu.colG, bA = cpu.colB, aA = cpu.alpha;
+            const sz = Math.max(1, Math.round(params.sampleStride * params.pointSizeMult));
+
+            for (let i = 0; i < n; i++) {
+              const a = aA[i];
+              if (a <= 0.02) continue;
+              const x = px[i] | 0;
+              const y = py[i] | 0;
+              if (x < 0 || x >= w || y < 0 || y >= h) continue;
+
+              const r = (rA[i] * a * 255) | 0;
+              const g = (gA[i] * a * 255) | 0;
+              const b = (bA[i] * a * 255) | 0;
+              const col = (255 << 24) | (b << 16) | (g << 8) | r;
+
+              pixels32[y * w + x] = col;
+              if (sz > 1 && x + 1 < w && y + 1 < h) {
+                pixels32[y * w + (x + 1)] = col;
+                pixels32[(y + 1) * w + x] = col;
+                pixels32[(y + 1) * w + (x + 1)] = col;
+              }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            if (params.glowOn) {
+              glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+              glowCtx.drawImage(canvas, 0, 0, glowCanvas.width, glowCanvas.height);
+              ctx.save();
+              ctx.globalCompositeOperation = 'lighter';
+              ctx.globalAlpha = 0.55;
+              ctx.drawImage(glowCanvas, 0, 0, w, h);
+              ctx.restore();
+            }
+          },
+          dispose() {}
+        };
+      }
+
+      /* -----------------------------------------------------------------------
+         7. ENGINE FACTORY (WEBGL2 -> WEBGL1 -> CANVAS2D AUTO-FALLBACK)
+         ----------------------------------------------------------------------- */
+      function createEngine() {
+        try {
+          const e2 = createWebGL2Engine();
+          if (e2) return e2;
+        } catch (err) {
+          console.warn('WebGL2 init failed, falling back to WebGL1:', err);
+          resetCanvasForFallback();
+        }
+
+        try {
+          const e1 = createWebGL1Engine();
+          if (e1) return e1;
+        } catch (err) {
+          console.warn('WebGL1 init failed, falling back to Canvas2D:', err);
+          resetCanvasForFallback();
+        }
+
+        try {
+          return createCanvas2DEngine();
+        } catch (err) {
+          console.error('All render engines failed:', err);
+          showToast('Graphics initialization failed on this device.');
+          return null;
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         8. PROCEDURAL 1920x1080 GARGANTUA BLACK HOLE ARTWORK
+            (Gravitational Lensing Halo + Relativistic Doppler Accretion Disk
+             + Incandescent Photon Ring + Pure Black Event Horizon)
+         ----------------------------------------------------------------------- */
+      function buildBlackHolePreset() {
+        const W = 1920;
+        const H = 1080;
+        presetCanvas.width = W;
+        presetCanvas.height = H;
+        const c = presetCtx;
+
+        // Pure deep-space OLED black backdrop
+        c.fillStyle = '#000000';
+        c.fillRect(0, 0, W, H);
+
+        // Deterministic PRNG for consistent crisp starfield & plasma filaments
+        let seed = 133791827 >>> 0;
+        function rand() {
+          seed ^= seed << 13;
+          seed ^= seed >>> 17;
+          seed ^= seed << 5;
+          return (seed >>> 0) / 4294967296;
+        }
+
+        const cx = W * 0.5;
+        const cy = H * 0.5;
+        const tilt = -0.175; // Cinematic ~ -10 degree Interstellar tilt
+        const R = 198;       // Event horizon shadow radius
+
+        // 1) Subtle Deep-Space Starfield (bent away from central black hole shadow)
+        c.save();
+        for (let i = 0; i < 420; i++) {
+          const sx = rand() * W;
+          const sy = rand() * H;
+          const dist = Math.hypot(sx - cx, sy - cy);
+          if (dist < R * 1.48) continue;
+
+          const size = 0.7 + Math.pow(rand(), 3.2) * 2.1;
+          const alpha = 0.25 + rand() * 0.70;
+          const tint = rand();
+          if (tint < 0.32) {
+            c.fillStyle = `rgba(195, 220, 255, ${alpha.toFixed(2)})`;
+          } else if (tint < 0.72) {
+            c.fillStyle = `rgba(255, 248, 238, ${alpha.toFixed(2)})`;
+          } else {
+            c.fillStyle = `rgba(255, 212, 165, ${alpha.toFixed(2)})`;
+          }
+          c.beginPath();
+          c.arc(sx, sy, size, 0, Math.PI * 2);
+          c.fill();
+        }
+        c.restore();
+
+        // Enter tilted Gargantua frame
+        c.save();
+        c.translate(cx, cy);
+        c.rotate(tilt);
+
+        // 2) Ambient Volumetric Cosmic Plasma Glow around the singularity
+        const ambientGlows = [
+          { x: -115, y: 0, rx: 690, ry: 215, col0: 'rgba(255, 190, 96, 0.24)', col1: 'rgba(255, 92, 24, 0.08)' },
+          { x: 95, y: 0, rx: 660, ry: 195, col0: 'rgba(255, 118, 36, 0.18)', col1: 'rgba(185, 42, 12, 0.06)' },
+          { x: 0, y: -15, rx: 355, ry: 355, col0: 'rgba(255, 164, 68, 0.22)', col1: 'rgba(220, 74, 18, 0.05)' }
+        ];
+        for (const g of ambientGlows) {
+          c.save();
+          c.scale(1, g.ry / g.rx);
+          const grad = c.createRadialGradient(g.x, g.y * (g.rx / g.ry), 20, g.x, g.y * (g.rx / g.ry), g.rx);
+          grad.addColorStop(0.0, g.col0);
+          grad.addColorStop(0.45, g.col1);
+          grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          c.fillStyle = grad;
+          c.fillRect(-W, -W, W * 2, W * 2);
+          c.restore();
+        }
+
+        // Helper: Relativistic plasma color with Doppler beaming (hotter white-gold on approaching left)
+        function plasmaColor(normDist, angle, alpha) {
+          const doppler = Math.max(0, Math.min(1, 0.52 - 0.48 * Math.cos(angle)));
+          const heat = Math.max(0, Math.min(1, (1.0 - normDist) * 0.85 + doppler * 0.42));
+
+          let r, g, b;
+          if (heat > 0.72) {
+            const k = (heat - 0.72) / 0.28;
+            r = 255;
+            g = Math.round(224 + 31 * k);
+            b = Math.round(146 + 109 * k);
+          } else if (heat > 0.38) {
+            const k = (heat - 0.38) / 0.34;
+            r = 255;
+            g = Math.round(126 + 98 * k);
+            b = Math.round(34 + 112 * k);
+          } else {
+            const k = heat / 0.38;
+            r = Math.round(165 + 90 * k);
+            g = Math.round(32 + 94 * k);
+            b = Math.round(8 + 26 * k);
+          }
+          return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
+        }
+
+        // 3) Gravitationally Lensed UPPER & LOWER Einstein Halo Arches
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+
+        for (let i = 0; i < 95; i++) {
+          const t = i / 94;
+          const rArch = R + 6 + Math.pow(t, 1.32) * 142;
+          const yLift = -14 - t * 18;
+          const rx = rArch * (1.03 + t * 0.08);
+          const ry = rArch * (0.98 + t * 0.06);
+
+          const startAng = Math.PI * (0.98 + rand() * 0.14);
+          const endAng = Math.PI * (2.02 - rand() * 0.14);
+          const lw = (1.6 + (1 - t) * 4.4) * (0.7 + rand() * 0.65);
+
+          const steps = 14;
+          for (let s = 0; s < steps; s++) {
+            const a0 = startAng + (endAng - startAng) * (s / steps);
+            const a1 = startAng + (endAng - startAng) * ((s + 1.05) / steps);
+            const midA = (a0 + a1) * 0.5;
+            const archEnv = Math.sin(((s + 0.5) / steps) * Math.PI);
+            const alpha = (0.28 * (1 - t * 0.72) + 0.06) * (0.35 + 0.65 * archEnv);
+
+            c.strokeStyle = plasmaColor(t * 0.92, midA, alpha);
+            c.lineWidth = lw;
+            c.beginPath();
+            c.ellipse(0, yLift, rx, ry, 0, a0, a1);
+            c.stroke();
+          }
+        }
+
+        for (let i = 0; i < 68; i++) {
+          const t = i / 67;
+          const rArch = R + 5 + Math.pow(t, 1.35) * 104;
+          const yDrop = 10 + t * 12;
+          const rx = rArch * (1.01 + t * 0.05);
+          const ry = rArch * (0.95 + t * 0.04);
+
+          const startAng = Math.PI * (0.04 + rand() * 0.12);
+          const endAng = Math.PI * (0.96 - rand() * 0.12);
+          const lw = (1.4 + (1 - t) * 3.6) * (0.7 + rand() * 0.6);
+
+          const steps = 12;
+          for (let s = 0; s < steps; s++) {
+            const a0 = startAng + (endAng - startAng) * (s / steps);
+            const a1 = startAng + (endAng - startAng) * ((s + 1.05) / steps);
+            const midA = (a0 + a1) * 0.5;
+            const archEnv = Math.sin(((s + 0.5) / steps) * Math.PI);
+            const alpha = (0.23 * (1 - t * 0.74) + 0.05) * (0.32 + 0.68 * archEnv);
+
+            c.strokeStyle = plasmaColor(t * 0.96, midA, alpha);
+            c.lineWidth = lw;
+            c.beginPath();
+            c.ellipse(0, yDrop, rx, ry, 0, a0, a1);
+            c.stroke();
+          }
+        }
+        c.restore();
+
+        // 4) Accretion Disk Drawer (back half behind event horizon, front half across it)
+        function drawDiskHalf(isFront) {
+          c.save();
+          c.globalCompositeOperation = 'lighter';
+
+          const ringCount = isFront ? 170 : 120;
+          for (let i = 0; i < ringCount; i++) {
+            const t = i / (ringCount - 1);
+            const rx = R * 1.12 + Math.pow(t, 1.24) * 535;
+            const ry = rx * (0.165 + t * 0.032);
+            const yShift = isFront ? (8 + t * 5) : (-4 - t * 3);
+
+            const segs = 20;
+            const baseStart = isFront ? -0.06 : Math.PI - 0.06;
+            const baseSpan = Math.PI + 0.12;
+
+            const filamentBoost = (rand() < 0.24) ? 1.55 : 0.85;
+            const lw = (1.5 + (1 - t) * 4.8 + rand() * 2.2) * (isFront ? 1.05 : 0.92);
+
+            for (let s = 0; s < segs; s++) {
+              const frac = (s + 0.5) / segs;
+              const a0 = baseStart + baseSpan * (s / segs);
+              const a1 = baseStart + baseSpan * ((s + 1.08) / segs);
+              const midA = (a0 + a1) * 0.5;
+
+              const wave = 0.62 + 0.38 * Math.sin(midA * 4.0 + t * 24.0 + i * 0.7);
+              const edgeFade = Math.sin(Math.min(1, Math.max(0, frac)) * Math.PI);
+              const radialFade = Math.pow(1.0 - t, 0.82);
+              const alpha = (isFront ? 0.24 : 0.17) * radialFade * filamentBoost * wave * (0.40 + 0.60 * edgeFade);
+
+              if (alpha < 0.012) continue;
+
+              c.strokeStyle = plasmaColor(t, midA, alpha);
+              c.lineWidth = lw;
+              c.beginPath();
+              c.ellipse(0, yShift, rx, ry, 0, a0, a1);
+              c.stroke();
+            }
+          }
+          c.restore();
+        }
+
+        drawDiskHalf(false);
+
+        // 5) Pure Pitch-Black Event Horizon Shadow Sphere
+        c.save();
+        c.beginPath();
+        c.arc(0, 0, R, 0, Math.PI * 2);
+        c.fillStyle = '#000000';
+        c.fill();
+
+        const shadowGrad = c.createRadialGradient(0, 0, R * 0.86, 0, 0, R);
+        shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        shadowGrad.addColorStop(0.92, 'rgba(0, 0, 0, 1)');
+        shadowGrad.addColorStop(1, 'rgba(18, 6, 0, 0.95)');
+        c.fillStyle = shadowGrad;
+        c.fill();
+        c.restore();
+
+        // 6) Razor-Sharp Incandescent Photon Ring
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        const photonSegs = 64;
+        for (let s = 0; s < photonSegs; s++) {
+          const a0 = (s / photonSegs) * Math.PI * 2;
+          const a1 = ((s + 1.15) / photonSegs) * Math.PI * 2;
+          const midA = (a0 + a1) * 0.5;
+          const doppler = 0.58 - 0.42 * Math.cos(midA);
+
+          c.strokeStyle = plasmaColor(0.28, midA, 0.42 + 0.32 * doppler);
+          c.lineWidth = 10.5;
+          c.beginPath();
+          c.arc(0, 0, R + 3.0, a0, a1);
+          c.stroke();
+
+          c.strokeStyle = plasmaColor(0.02, midA, 0.72 + 0.28 * doppler);
+          c.lineWidth = 3.2;
+          c.beginPath();
+          c.arc(0, 0, R + 1.0, a0, a1);
+          c.stroke();
+        }
+        c.restore();
+
+        // 7) Front Relativistic Accretion Disk
+        drawDiskHalf(true);
+
+        // 8) Equatorial Plasma Core Streak, Doppler Hotspot & Orbiting Embers
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        const hotRings = [
+          { rx: R * 1.38, ry: R * 0.21, lw: 7.5, a: 0.62, norm: 0.04 },
+          { rx: R * 1.62, ry: R * 0.26, lw: 5.5, a: 0.52, norm: 0.14 },
+          { rx: R * 1.98, ry: R * 0.33, lw: 4.0, a: 0.38, norm: 0.28 },
+          { rx: R * 2.45, ry: R * 0.43, lw: 2.8, a: 0.26, norm: 0.48 }
+        ];
+        for (const hr of hotRings) {
+          const segs = 28;
+          for (let s = 0; s < segs; s++) {
+            const a0 = -0.08 + (Math.PI + 0.16) * (s / segs);
+            const a1 = -0.08 + (Math.PI + 0.16) * ((s + 1.1) / segs);
+            const midA = (a0 + a1) * 0.5;
+            c.strokeStyle = plasmaColor(hr.norm, midA, hr.a);
+            c.lineWidth = hr.lw;
+            c.beginPath();
+            c.ellipse(0, 10, hr.rx, hr.ry, 0, a0, a1);
+            c.stroke();
+          }
+        }
+
+        const dopplerSpot = c.createRadialGradient(-R * 1.16, 10, 6, -R * 1.16, 10, 165);
+        dopplerSpot.addColorStop(0.0, 'rgba(255, 252, 238, 0.72)');
+        dopplerSpot.addColorStop(0.28, 'rgba(255, 206, 120, 0.36)');
+        dopplerSpot.addColorStop(0.65, 'rgba(255, 112, 32, 0.10)');
+        dopplerSpot.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = dopplerSpot;
+        c.beginPath();
+        c.arc(-R * 1.16, 10, 165, 0, Math.PI * 2);
+        c.fill();
+
+        for (let i = 0; i < 240; i++) {
+          const t = rand();
+          const rx = R * 1.12 + Math.pow(t, 1.1) * 550;
+          const ry = rx * (0.17 + t * 0.035);
+          const ang = rand() * Math.PI * 2;
+          const ex = Math.cos(ang) * rx;
+          const ey = Math.sin(ang) * ry + (ang < Math.PI ? 10 : -4);
+          if (ang > Math.PI && Math.hypot(ex, ey) < R * 0.98) continue;
+
+          const er = 1.0 + rand() * 2.4;
+          c.fillStyle = plasmaColor(t * 0.85, ang, 0.45 + rand() * 0.50);
+          c.beginPath();
+          c.arc(ex, ey, er, 0, Math.PI * 2);
+          c.fill();
+        }
+        c.restore();
+
+        // Dark vignette mask inside the very center of the event horizon
+        c.save();
+        const coreMask = c.createRadialGradient(0, -14, 0, 0, -14, R * 0.78);
+        coreMask.addColorStop(0.0, 'rgba(0, 0, 0, 0.92)');
+        coreMask.addColorStop(0.70, 'rgba(0, 0, 0, 0.55)');
+        coreMask.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+        c.fillStyle = coreMask;
+        c.beginPath();
+        c.arc(0, -14, R * 0.78, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+
+        c.restore(); // Exit tilted Gargantua frame
+      }
+
+      /* -----------------------------------------------------------------------
+         9. SMART CONTENT-AWARE FRAMING + UNIFORM PIXEL-GRID HD SAMPLER
+         ----------------------------------------------------------------------- */
+      function getActiveSourceDescriptor() {
+        if (state.sourceType === 'upload' && state.uploadedImage) {
+          return {
+            el: state.uploadedImage,
+            w: state.uploadedImage.naturalWidth || state.uploadedImage.width,
+            h: state.uploadedImage.naturalHeight || state.uploadedImage.height
+          };
+        }
+        return {
+          el: presetCanvas,
+          w: presetCanvas.width,
+          h: presetCanvas.height
+        };
+      }
+
+      // Detects tight subject bounding box so black-background wallpapers fill phones cleanly
+      function computeSmartCropRect(src, cutoff) {
+        const full = { sx: 0, sy: 0, sw: src.w, sh: src.h };
+        if (!state.smartFit) return full;
+
+        // For the procedural Black Hole preset, keep the full relativistic accretion disk & lensed halo centered
+        if (state.sourceType === 'preset') {
+          const isPortrait = state.physHeight > state.physWidth * 1.08;
+          if (isPortrait) {
+            const sw = Math.round(src.w * 0.80);
+            const sh = Math.round(src.h * 0.86);
+            return {
+              sx: Math.round((src.w - sw) * 0.5),
+              sy: Math.round((src.h - sh) * 0.5),
+              sw,
+              sh
+            };
+          }
+          return full;
+        }
+
+        const maxDim = 480;
+        const scale = Math.min(1, maxDim / Math.max(src.w, src.h));
+        const bw = Math.max(2, Math.round(src.w * scale));
+        const bh = Math.max(2, Math.round(src.h * scale));
+
+        bboxCanvas.width = bw;
+        bboxCanvas.height = bh;
+        bboxCtx.clearRect(0, 0, bw, bh);
+        bboxCtx.drawImage(src.el, 0, 0, bw, bh);
+
+        const data = bboxCtx.getImageData(0, 0, bw, bh).data;
+        const thresh = Math.max(cutoff + 6, 14);
+
+        let minX = bw, minY = bh, maxX = -1, maxY = -1;
+        for (let y = 0; y < bh; y++) {
+          const rowOff = y * bw;
+          for (let x = 0; x < bw; x++) {
+            const idx = (rowOff + x) * 4;
+            if (data[idx + 3] <= 24) continue;
+            const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+            const luma = (r * 77 + g * 150 + b * 29) >> 8;
+            if (luma > thresh || Math.max(r, g, b) > thresh + 6) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        if (maxX <= minX || maxY <= minY) return full;
+
+        const boxW = maxX - minX + 1;
+        const boxH = maxY - minY + 1;
+        const isPortrait = state.physHeight > state.physWidth * 1.08;
+
+        const padX = Math.round(boxW * (isPortrait ? 0.04 : 0.08));
+        const padY = Math.round(boxH * 0.05);
+
+        const sx = Math.max(0, Math.floor((minX - padX) / scale));
+        const sy = Math.max(0, Math.floor((minY - padY) / scale));
+        const ex = Math.min(src.w, Math.ceil((maxX + 1 + padX) / scale));
+        const touchesBottom = maxY >= bh - 3;
+        const ey = touchesBottom ? src.h : Math.min(src.h, Math.ceil((maxY + 1 + padY) / scale));
+
+        const sw = Math.max(16, ex - sx);
+        const sh = Math.max(16, ey - sy);
+
+        if (sw > src.w * 0.94 && sh > src.h * 0.94) return full;
+        return { sx, sy, sw, sh };
+      }
+
+      function sampleActiveSourceHD(restartCycle) {
+        if (!engine) return;
+        const W = state.physWidth;
+        const H = state.physHeight;
+        if (W <= 1 || H <= 1) return;
+
+        const src = getActiveSourceDescriptor();
+        if (!src.el || src.w <= 0 || src.h <= 0) return;
+
+        const crop = computeSmartCropRect(src, state.cutoff);
+        const isPortrait = H > W * 1.08;
+
+        // Reserve clean vertical safe margin on phones so artwork sits centered between top HUD and bottom bar
+        const padLeft = Math.round(W * (isPortrait ? 0.025 : 0.03));
+        const padRight = padLeft;
+        const padTop = Math.round(H * (isPortrait ? 0.10 : 0.03));
+        const padBottom = Math.round(H * (isPortrait ? 0.11 : 0.03));
+
+        const availW = Math.max(1, W - padLeft - padRight);
+        const availH = Math.max(1, H - padTop - padBottom);
+        const scale = Math.min(availW / crop.sw, availH / crop.sh);
+
+        const drawW = Math.max(1, Math.round(crop.sw * scale));
+        const drawH = Math.max(1, Math.round(crop.sh * scale));
+        const offsetX = Math.floor(padLeft + (availW - drawW) * 0.5);
+        const offsetY = Math.floor(padTop + (availH - drawH) * 0.5);
+
+        // Store exact image bounds in WebGL UV coordinates
+        state.imgRectUV = [
+          offsetX / W,
+          1.0 - (offsetY + drawH) / H,
+          (offsetX + drawW) / W,
+          1.0 - offsetY / H
+        ];
+
+        sampleCanvas.width = drawW;
+        sampleCanvas.height = drawH;
+        sampleCtx.clearRect(0, 0, drawW, drawH);
+        sampleCtx.imageSmoothingEnabled = true;
+        sampleCtx.imageSmoothingQuality = 'high';
+        sampleCtx.drawImage(src.el, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, drawW, drawH);
+
+        const data = sampleCtx.getImageData(0, 0, drawW, drawH).data;
+        const cutoff = state.cutoff;
+        const maxBudget = state.maxBudget;
+
+        // Pass 1: Count visible pixels
+        let visibleCount = 0;
+        const totalPixels = drawW * drawH;
+        for (let p = 0; p < totalPixels; p++) {
+          const idx = p * 4;
+          if (data[idx + 3] <= 20) continue;
+          const luma = (data[idx] * 77 + data[idx + 1] * 150 + data[idx + 2] * 29) >> 8;
+          if (luma > cutoff || Math.max(data[idx], data[idx + 1], data[idx + 2]) > cutoff + 4) {
+            visibleCount++;
+          }
+        }
+
+        const effectiveCutoff = visibleCount > 64 ? cutoff : -1;
+        if (visibleCount <= 64) {
+          visibleCount = totalPixels;
+        }
+
+        // Uniform pixel-grid stride
+        const stride = visibleCount > maxBudget ? Math.sqrt(visibleCount / maxBudget) : 1.0;
+        state.sampleStride = stride;
+
+        const estCols = Math.ceil(drawW / stride);
+        const estRows = Math.ceil(drawH / stride);
+        const cap = Math.min(maxBudget + 2048, estCols * estRows + 64);
+
+        const staticData = new Float32Array(cap * 11);
+        const initialStateData = new Float32Array(cap * 6);
+
+        let count = 0;
+        let rng = 2463534242 >>> 0;
+        function rand01() {
+          rng ^= rng << 13;
+          rng ^= rng >>> 17;
+          rng ^= rng << 5;
+          return (rng >>> 0) / 4294967296;
+        }
+
+        const margin = Math.max(18, Math.round(Math.min(W, H) * 0.04));
+        const cx = W * 0.5;
+        const cy = H * 0.5;
+        const invMaxDist = 1.0 / (Math.hypot(drawW * 0.5, drawH * 0.5) + 1.0);
+
+        // Pass 2: Extract pixel grid + 4-border spawn origins
+        for (let fy = 0; fy < drawH && count < maxBudget; fy += stride) {
+          const y = fy | 0;
+          const rowOff = y * drawW;
+          for (let fx = 0; fx < drawW && count < maxBudget; fx += stride) {
+            const x = fx | 0;
+            const idx = (rowOff + x) * 4;
+            if (data[idx + 3] <= 20) continue;
+
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            if (effectiveCutoff >= 0) {
+              const luma = (r * 77 + g * 150 + b * 29) >> 8;
+              if (luma <= effectiveCutoff && Math.max(r, g, b) <= effectiveCutoff + 4) continue;
+            }
+
+            const homeX = offsetX + x + 0.5;
+            const homeY = offsetY + y + 0.5;
+
+            const side = count & 3; // 0=Top, 1=Right, 2=Bottom, 3=Left
+            const jitter = (rand01() - 0.5) * margin * 1.4;
+            let borderX = 0;
+            let borderY = 0;
+            if (side === 0) {
+              borderX = rand01() * W;
+              borderY = -margin + jitter;
+            } else if (side === 1) {
+              borderX = W + margin + jitter;
+              borderY = rand01() * H;
+            } else if (side === 2) {
+              borderX = rand01() * W;
+              borderY = H + margin + jitter;
+            } else {
+              borderX = -margin + jitter;
+              borderY = rand01() * H;
+            }
+
+            const mass = 0.72 + rand01() * 0.68;
+            const phase = rand01() * Math.PI * 2.0;
+            const radialNorm = Math.min(1.0, Math.hypot(homeX - cx, homeY - cy) * invMaxDist);
+            const baseDelay = radialNorm * 0.24 + rand01() * 0.14;
+            const waveCoord = x / Math.max(1, drawW);
+
+            const s = count * 11;
+            staticData[s] = homeX;
+            staticData[s + 1] = homeY;
+            staticData[s + 2] = borderX;
+            staticData[s + 3] = borderY;
+            staticData[s + 4] = r / 255.0;
+            staticData[s + 5] = g / 255.0;
+            staticData[s + 6] = b / 255.0;
+            staticData[s + 7] = mass;
+            staticData[s + 8] = phase;
+            staticData[s + 9] = baseDelay;
+            staticData[s + 10] = waveCoord;
+
+            const d = count * 6;
+            initialStateData[d] = borderX;
+            initialStateData[d + 1] = borderY;
+            initialStateData[d + 2] = 0;
+            initialStateData[d + 3] = 0;
+            initialStateData[d + 4] = 0;
+            initialStateData[d + 5] = 0;
+
+            count++;
+          }
+        }
+
+        state.activeCount = count;
+        hudCount.textContent = count.toLocaleString();
+        strideTag.textContent = `Grid ${stride.toFixed(2)}px`;
+
+        engine.uploadParticles(
+          staticData.subarray(0, count * 11),
+          initialStateData.subarray(0, count * 6),
+          count
+        );
+
+        if (restartCycle) {
+          startConvergenceCycle();
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         10. 4-PHASE ANIMATION STATE MACHINE
+         ----------------------------------------------------------------------- */
+      function startConvergenceCycle() {
+        state.phase = PHASE_ASSEMBLE;
+        state.phaseElapsed = 0;
+        state.phaseProgress = 0;
+        state.endBlur = 0.0;
+        state.edgeMaskFactor = 0.0;
+        state.cycleSeed = (state.cycleSeed % 997) + 1;
+        if (engine) engine.triggerBorderSpawn();
+        updatePhaseHUD();
+      }
+
+      function advanceCycle(dt) {
+        PHASE_DURATIONS[PHASE_HOLD] = state.holdDuration;
+        const dur = PHASE_DURATIONS[state.phase];
+        state.phaseElapsed += dt;
+
+        if (!state.autoLoop && state.phase === PHASE_HOLD) {
+          state.phaseProgress = 1.0;
+          state.endBlur = 0.0;
+          state.edgeMaskFactor = 1.0;
+          return;
+        }
+
+        if (state.phaseElapsed >= dur) {
+          state.phaseElapsed = 0;
+
+          if (state.phase === PHASE_ASSEMBLE) {
+            state.phase = PHASE_HOLD;
+          } else if (state.phase === PHASE_HOLD) {
+            state.phase = state.autoLoop ? PHASE_DISAPPEAR : PHASE_HOLD;
+          } else if (state.phase === PHASE_DISAPPEAR) {
+            state.phase = PHASE_REFORM;
+          } else {
+            state.phase = PHASE_ASSEMBLE;
+            state.cycleSeed = (state.cycleSeed % 997) + 1;
+            if (engine) engine.triggerBorderSpawn();
+          }
+        }
+
+        const curDur = PHASE_DURATIONS[state.phase];
+        state.phaseProgress = Math.min(1.0, state.phaseElapsed / Math.max(0.001, curDur));
+
+        if (state.phase === PHASE_ASSEMBLE) {
+          state.endBlur = 0.0;
+          const ef = Math.max(0, Math.min(1, (state.phaseProgress - 0.68) / 0.32));
+          state.edgeMaskFactor = ef * ef * (3.0 - 2.0 * ef);
+        } else if (state.phase === PHASE_HOLD) {
+          state.endBlur = 0.0;
+          state.edgeMaskFactor = 1.0;
+        } else if (state.phase === PHASE_DISAPPEAR) {
+          const bt = Math.min(1.0, state.phaseProgress / 0.85);
+          const eased = bt * bt * (3.0 - 2.0 * bt);
+          state.endBlur = eased * state.endingBlurStrength;
+          const relT = Math.min(1.0, state.phaseProgress / 0.45);
+          state.edgeMaskFactor = 1.0 - (relT * relT * (3.0 - 2.0 * relT));
+        } else {
+          state.endBlur = 0.0;
+          state.edgeMaskFactor = 0.0;
+        }
+      }
+
+      function updatePhaseHUD() {
+        if (lastPhaseShown !== state.phase) {
+          lastPhaseShown = state.phase;
+          phasePill.dataset.phase = PHASE_KEYS[state.phase];
+          phaseLabel.textContent = PHASE_NAMES[state.phase];
+        }
+        phaseBarFill.style.width = `${(state.phaseProgress * 100).toFixed(1)}%`;
+      }
+
+      /* -----------------------------------------------------------------------
+         11. VIEWPORT RESIZE & RENDER LOOP
+         ----------------------------------------------------------------------- */
+      function getViewportSize() {
+        if (window.visualViewport) {
+          return {
+            w: Math.max(1, Math.round(window.visualViewport.width)),
+            h: Math.max(1, Math.round(window.visualViewport.height))
+          };
+        }
+        return {
+          w: Math.max(1, window.innerWidth),
+          h: Math.max(1, window.innerHeight)
+        };
+      }
+
+      function resizeViewport(shouldResample) {
+        const mobileNow = detectPhoneLayout();
+        const maxDpr = mobileNow ? 1.5 : 2.0;
+        const dpr = state.dprMode === '1x' ? 1.0 : Math.min(window.devicePixelRatio || 1, maxDpr);
+        const vp = getViewportSize();
+        const physW = Math.max(1, Math.round(vp.w * dpr));
+        const physH = Math.max(1, Math.round(vp.h * dpr));
+
+        state.dpr = dpr;
+        state.cssWidth = vp.w;
+        state.cssHeight = vp.h;
+        state.physWidth = physW;
+        state.physHeight = physH;
+
+        canvas.width = physW;
+        canvas.height = physH;
+
+        if (engine) {
+          engine.resize(physW, physH);
+        }
+        if (shouldResample) {
+          sampleActiveSourceHD(true);
+        }
+      }
+
+      function buildRenderParams() {
+        return {
+          simTime: state.simTime,
+          resW: state.physWidth,
+          resH: state.physHeight,
+          phase: state.phase,
+          phaseProgress: state.phaseProgress,
+          disappearStyle: state.disappearStyle,
+          cycleSeed: state.cycleSeed,
+          windOverride: state.windOverride,
+          gust: state.gust,
+          pointerActive: state.pointerActive,
+          pointerPhysX: state.pointerPhysX,
+          pointerPhysY: state.pointerPhysY,
+          cursorRadiusPhys: state.cursorRadiusCss * state.dpr,
+          cursorMode: state.cursorMode,
+          dpr: state.dpr,
+          glowOn: state.glowOn,
+          endBlur: state.endBlur,
+          edgeSoftness: state.edgeSoftness,
+          edgeMaskFactor: state.edgeMaskFactor,
+          imgRectUV: state.imgRectUV,
+          sampleStride: state.sampleStride,
+          pointSizeMult: state.pointSizeMult
+        };
+      }
+
+      function frameLoop(now) {
+        requestAnimationFrame(frameLoop);
+
+        const rawMs = now - lastNow;
+        lastNow = now;
+        const dt = Math.min(Math.max(rawMs / 1000.0, 0.001), 0.05);
+
+        state.simTime += dt;
+        if (state.windOverride) {
+          state.gust = Math.max(
+            0.0,
+            0.55 + 0.45 * Math.sin(state.simTime * 1.45) + 0.25 * Math.sin(state.simTime * 3.15)
+          );
+        } else {
+          state.gust = 0.0;
+        }
+
+        advanceCycle(dt);
+        updatePhaseHUD();
+
+        const params = buildRenderParams();
+        if (engine) {
+          engine.stepPhysics(dt, params);
+          engine.render(params);
+        }
+
+        fpsFrames++;
+        fpsAccum += rawMs;
+        smoothMs = smoothMs * 0.92 + Math.min(rawMs, 100) * 0.08;
+        if (fpsAccum >= 320) {
+          const fps = Math.round((fpsFrames * 1000) / fpsAccum);
+          hudFps.textContent = String(fps);
+          hudMs.textContent = smoothMs.toFixed(1);
+          fpsFrames = 0;
+          fpsAccum = 0;
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         12. UI SYNC, PRESET LOADER & IMAGE UPLOAD
+         ----------------------------------------------------------------------- */
+      function updateCursorRing() {
+        const d = state.cursorRadiusCss * 2;
+        cursorRing.style.width = `${d}px`;
+        cursorRing.style.height = `${d}px`;
+        cursorRing.classList.toggle('vortex', state.cursorMode === 'vortex');
+        if (state.pointerActive && state.phase <= PHASE_HOLD) {
+          cursorRing.style.opacity = state.pointerTouch ? '0.68' : '1';
+          cursorRing.style.transform = `translate3d(${state.pointerCssX - state.cursorRadiusCss}px, ${state.pointerCssY - state.cursorRadiusCss}px, 0)`;
+        } else {
+          cursorRing.style.opacity = '0';
+        }
+      }
+
+      function syncUI() {
+        btnLoop.classList.toggle('active', state.autoLoop);
+        btnLoop.textContent = state.autoLoop ? 'Loop ON' : 'Loop OFF';
+        mBtnLoop.classList.toggle('active', state.autoLoop);
+        mBtnLoop.textContent = state.autoLoop ? 'Loop ON' : 'Loop';
+
+        btnWind.classList.toggle('active', state.windOverride);
+        btnWind.textContent = state.windOverride ? 'Wind ON' : 'Wind';
+
+        btnGlow.classList.toggle('active', state.glowOn);
+        btnGlow.textContent = state.glowOn ? 'Glow ON' : 'Glow OFF';
+
+        btnSmartFit.classList.toggle('active', state.smartFit);
+        btnSmartFit.textContent = state.smartFit ? 'Smart Fit' : 'Full Frame';
+
+        const isVortex = state.cursorMode === 'vortex';
+        modeRepel.classList.toggle('selected', !isVortex);
+        modeVortex.classList.toggle('selected', isVortex);
+
+        dpr1x.classList.toggle('selected', state.dprMode === '1x');
+        dprNative.classList.toggle('selected', state.dprMode === 'native');
+
+        btnDefaultBlackHole.classList.toggle('active', state.sourceType === 'preset');
+
+        styleButtons.forEach((b) => {
+          b.classList.toggle('selected', parseInt(b.dataset.style, 10) === state.disappearStyle);
+        });
+        styleTag.textContent = DISAPPEAR_NAMES[state.disappearStyle];
+
+        budgetButtons.forEach((b) => {
+          b.classList.toggle('selected', parseInt(b.dataset.budget, 10) === state.maxBudget);
+        });
+
+        sliderEndBlur.value = String(Math.round(state.endingBlurStrength * 100));
+        valEndBlur.textContent = `${Math.round(state.endingBlurStrength * 100)}%`;
+
+        sliderEdgeSoft.value = String(Math.round(state.edgeSoftness * 100));
+        valEdgeSoft.textContent = `${Math.round(state.edgeSoftness * 100)}%`;
+
+        sliderHoldDur.value = String(state.holdDuration);
+        valHoldDur.textContent = `${state.holdDuration.toFixed(1)}s`;
+
+        sliderCutoff.value = String(state.cutoff);
+        valCutoff.textContent = String(state.cutoff);
+
+        sliderRadius.value = String(state.cursorRadiusCss);
+        valRadius.textContent = `${state.cursorRadiusCss}px`;
+
+        sliderSize.value = String(state.pointSizeMult);
+        valSize.textContent = `${state.pointSizeMult.toFixed(2)}\u00D7`;
+
+        updateCursorRing();
+      }
+
+      function loadDefaultBlackHolePreset() {
+        state.sourceType = 'preset';
+        state.cutoff = 6;
+        sliderCutoff.value = '6';
+        valCutoff.textContent = '6';
+        activeSourceTag.textContent = 'Gargantua Black Hole';
+        uploadHint.textContent = 'Relativistic accretion disk & Einstein lensing \u2014 upload any photo anytime';
+
+        buildBlackHolePreset();
+        sampleActiveSourceHD(true);
+        syncUI();
+        showToast('Gargantua Black Hole \u2014 Converging from all 4 borders');
+      }
+
+      function loadUploadedImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+          showToast('Please select a PNG, JPG, or WebP image.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => showToast('Could not read selected file.');
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onerror = () => showToast('Unsupported or corrupted image file.');
+          img.onload = () => {
+            state.uploadedImage = img;
+            state.uploadedName = file.name;
+            state.sourceType = 'upload';
+
+            state.cutoff = 6;
+            sliderCutoff.value = '6';
+            valCutoff.textContent = '6';
+
+            const shortName = file.name.length > 22 ? file.name.slice(0, 19) + '...' : file.name;
+            activeSourceTag.textContent = shortName;
+            uploadHint.textContent = `Loaded: ${img.naturalWidth}\u00D7${img.naturalHeight}px \u2014 Lossless HD`;
+
+            sampleActiveSourceHD(true);
+            syncUI();
+            if (detectPhoneLayout() && !controlDock.classList.contains('collapsed')) {
+              toggleDockDrawer();
+            }
+            showToast(`Converging ${state.activeCount.toLocaleString()} HD particles!`);
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      /* -----------------------------------------------------------------------
+         13. EVENT LISTENERS (MOUSE, TOUCH, CONTEXT RECOVERY, CONTROLS, DRAG & DROP)
+         ----------------------------------------------------------------------- */
+      function setPointerPos(clientX, clientY, isTouch) {
+        state.pointerActive = true;
+        state.pointerTouch = isTouch;
+        state.pointerCssX = clientX;
+        state.pointerCssY = clientY;
+        state.pointerPhysX = clientX * state.dpr;
+        state.pointerPhysY = clientY * state.dpr;
+        updateCursorRing();
+      }
+
+      function attachCanvasPointerEvents(targetCanvas) {
+        targetCanvas.addEventListener('mousemove', (e) => {
+          setPointerPos(e.clientX, e.clientY, false);
+        });
+
+        targetCanvas.addEventListener('mouseleave', () => {
+          state.pointerActive = false;
+          updateCursorRing();
+        });
+
+        targetCanvas.addEventListener('touchstart', (e) => {
+          if (e.touches.length > 0) {
+            const t = e.touches[0];
+            setPointerPos(t.clientX, t.clientY, true);
+          }
+        }, { passive: true });
+
+        // Non-passive touchmove on canvas prevents mobile browser scroll / pull-to-refresh while sculpting particles
+        targetCanvas.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) {
+            e.preventDefault();
+            const t = e.touches[0];
+            setPointerPos(t.clientX, t.clientY, true);
+          }
+        }, { passive: false });
+
+        targetCanvas.addEventListener('touchend', () => {
+          state.pointerActive = false;
+          updateCursorRing();
+        }, { passive: true });
+
+        targetCanvas.addEventListener('touchcancel', () => {
+          state.pointerActive = false;
+          updateCursorRing();
+        }, { passive: true });
+
+        // Graceful mobile WebGL context loss recovery
+        targetCanvas.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault();
+          showToast('Graphics paused \u2014 restoring...');
+        }, false);
+
+        targetCanvas.addEventListener('webglcontextrestored', () => {
+          try {
+            if (engine && engine.dispose) engine.dispose();
+            engine = createEngine();
+            if (engine) {
+              hudEngine.textContent = engine.modeName;
+              resizeViewport(true);
+              showToast('Graphics restored!');
+            }
+          } catch (err) {
+            console.error('Context restore failed:', err);
+          }
+        }, false);
+      }
+
+      attachCanvasPointerEvents(canvas);
+
+      // Dock Expand / Collapse & Hide UI
+      dockHeader.addEventListener('click', (e) => {
+        if (e.target.closest('#btnHideUI')) return;
+        toggleDockDrawer();
+      });
+
+      dockGrab.addEventListener('click', toggleDockDrawer);
+      mBtnDrawer.addEventListener('click', toggleDockDrawer);
+
+      btnHideUI.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleUIHidden();
+      });
+
+      btnHideUIMobile.addEventListener('click', toggleUIHidden);
+      uiRestoreBtn.addEventListener('click', toggleUIHidden);
+
+      // Upload, Mobile Quick Bar & Default Preset
+      btnUpload.addEventListener('click', () => fileInput.click());
+      mBtnUpload.addEventListener('click', () => fileInput.click());
+
+      mBtnReplay.addEventListener('click', () => {
+        startConvergenceCycle();
+        showToast('Converging from all 4 borders...');
+      });
+
+      mBtnLoop.addEventListener('click', () => {
+        state.autoLoop = !state.autoLoop;
+        syncUI();
+        showToast(state.autoLoop ? 'Auto-Loop ON' : 'Auto-Loop OFF');
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          loadUploadedImageFile(e.target.files[0]);
+          fileInput.value = '';
+        }
+      });
+
+      btnDefaultBlackHole.addEventListener('click', loadDefaultBlackHolePreset);
+
+      // Disappear Style Selector
+      styleButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.disappearStyle = parseInt(btn.dataset.style, 10);
+          syncUI();
+          showToast(`Disappear Style: ${DISAPPEAR_NAMES[state.disappearStyle]}`);
+        });
+      });
+
+      // Particle Density Selector
+      budgetButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const next = parseInt(btn.dataset.budget, 10);
+          if (next === state.maxBudget) return;
+          state.maxBudget = next;
+          sampleActiveSourceHD(true);
+          syncUI();
+          showToast(`Density: ${(next / 1000) | 0}K particles`);
+        });
+      });
+
+      // Resolution Mode Toggle
+      dpr1x.addEventListener('click', () => {
+        if (state.dprMode === '1x') return;
+        state.dprMode = '1x';
+        resizeViewport(true);
+        syncUI();
+        showToast('Resolution: 1x Max FPS');
+      });
+
+      dprNative.addEventListener('click', () => {
+        if (state.dprMode === 'native') return;
+        state.dprMode = 'native';
+        resizeViewport(true);
+        syncUI();
+        showToast('Resolution: Native HD');
+      });
+
+      // Cursor / Touch Force Mode
+      modeRepel.addEventListener('click', () => {
+        state.cursorMode = 'repel';
+        syncUI();
+      });
+
+      modeVortex.addEventListener('click', () => {
+        state.cursorMode = 'vortex';
+        syncUI();
+      });
+
+      // Action Buttons
+      btnLoop.addEventListener('click', () => {
+        state.autoLoop = !state.autoLoop;
+        syncUI();
+        showToast(state.autoLoop ? 'Auto-Loop ON' : 'Auto-Loop OFF (Holding sharp image)');
+      });
+
+      btnReplay.addEventListener('click', () => {
+        startConvergenceCycle();
+        showToast('Converging from all 4 borders...');
+      });
+
+      btnWind.addEventListener('click', () => {
+        state.windOverride = !state.windOverride;
+        syncUI();
+        showToast(state.windOverride ? 'Wind Gust ON' : 'Wind Gust OFF');
+      });
+
+      btnGlow.addEventListener('click', () => {
+        state.glowOn = !state.glowOn;
+        syncUI();
+        showToast(state.glowOn ? 'Selective Cosmic Glow ON' : 'Glow OFF');
+      });
+
+      btnSmartFit.addEventListener('click', () => {
+        state.smartFit = !state.smartFit;
+        sampleActiveSourceHD(true);
+        syncUI();
+        showToast(state.smartFit ? 'Smart Fit ON (Zoomed to subject)' : 'Full Frame (Original margins)');
+      });
+
+      btnSnap.addEventListener('click', saveSnapshotPNG);
+
+      // Sliders
+      sliderEndBlur.addEventListener('input', () => {
+        const pct = parseInt(sliderEndBlur.value, 10);
+        state.endingBlurStrength = pct / 100;
+        valEndBlur.textContent = `${pct}%`;
+      });
+
+      sliderEdgeSoft.addEventListener('input', () => {
+        const pct = parseInt(sliderEdgeSoft.value, 10);
+        state.edgeSoftness = pct / 100;
+        valEdgeSoft.textContent = `${pct}%`;
+      });
+
+      sliderHoldDur.addEventListener('input', () => {
+        state.holdDuration = parseFloat(sliderHoldDur.value);
+        valHoldDur.textContent = `${state.holdDuration.toFixed(1)}s`;
+      });
+
+      let cutoffTimer = null;
+      sliderCutoff.addEventListener('input', () => {
+        state.cutoff = parseInt(sliderCutoff.value, 10);
+        valCutoff.textContent = String(state.cutoff);
+        if (cutoffTimer) clearTimeout(cutoffTimer);
+        cutoffTimer = setTimeout(() => {
+          sampleActiveSourceHD(false);
+        }, 90);
+      });
+
+      sliderRadius.addEventListener('input', () => {
+        state.cursorRadiusCss = parseInt(sliderRadius.value, 10);
+        valRadius.textContent = `${state.cursorRadiusCss}px`;
+        updateCursorRing();
+      });
+
+      sliderSize.addEventListener('input', () => {
+        state.pointSizeMult = parseFloat(sliderSize.value);
+        valSize.textContent = `${state.pointSizeMult.toFixed(2)}\u00D7`;
+      });
+
+      // Keyboard Shortcuts
+      window.addEventListener('keydown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (e.code === 'Space') {
+          e.preventDefault();
+          state.windOverride = !state.windOverride;
+          syncUI();
+          showToast(state.windOverride ? 'Wind Gust ON' : 'Wind Gust OFF');
+        } else if (e.key === 'r' || e.key === 'R') {
+          startConvergenceCycle();
+          showToast('Replaying 4-border convergence...');
+        } else if (e.key === 'g' || e.key === 'G') {
+          state.glowOn = !state.glowOn;
+          syncUI();
+          showToast(state.glowOn ? 'Selective Cosmic Glow ON' : 'Glow OFF');
+        } else if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          saveSnapshotPNG();
+        } else if (e.key === 'h' || e.key === 'H') {
+          toggleUIHidden();
+        } else if (e.key === 'l' || e.key === 'L') {
+          state.autoLoop = !state.autoLoop;
+          syncUI();
+          showToast(state.autoLoop ? 'Auto-Loop ON' : 'Auto-Loop OFF');
+        }
+      });
+
+      // Drag & Drop Anywhere
+      let dragCounter = 0;
+      window.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        dragCounter++;
+        dropOverlay.classList.add('active');
+      });
+
+      window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+
+      window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dragCounter = Math.max(0, dragCounter - 1);
+        if (dragCounter === 0) dropOverlay.classList.remove('active');
+      });
+
+      window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragCounter = 0;
+        dropOverlay.classList.remove('active');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+          loadUploadedImageFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Resize & Mobile Orientation / Address-Bar Resize Handling
+      let resizeTimer = null;
+      function scheduleResize() {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const vp = getViewportSize();
+          if (Math.abs(vp.w - state.cssWidth) > 2 || Math.abs(vp.h - state.cssHeight) > 40) {
+            resizeViewport(true);
+          }
+        }, 180);
+      }
+
+      window.addEventListener('resize', scheduleResize);
+      window.addEventListener('orientationchange', scheduleResize);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scheduleResize);
+      }
+
+      /* -----------------------------------------------------------------------
+         14. BOOTSTRAP ON LOAD
+         ----------------------------------------------------------------------- */
+      function bootSimulation() {
+        if (engine) return;
+        if (isMobile) {
+          controlDock.classList.add('collapsed');
+          btnCollapse.innerHTML = '&#9656;';
+          mBtnDrawer.innerHTML = '&#9776;';
+        }
+
+        engine = createEngine();
+        if (!engine) return;
+
+        hudEngine.textContent = engine.modeName;
+        buildBlackHolePreset();
+        resizeViewport(false);
+        sampleActiveSourceHD(true);
+        syncUI();
+
+        lastNow = performance.now();
+        requestAnimationFrame(frameLoop);
+      }
+
+      if (document.readyState === 'complete') {
+        bootSimulation();
+      } else {
+        window.addEventListener('load', bootSimulation);
+      }
+    })();
+  </script>
+</body>
+</html>
